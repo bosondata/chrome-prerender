@@ -65,6 +65,11 @@ class Tab:
             'method': 'Page.enable'
         }))
         await self.websocket.recv()
+        await self.websocket.send(json.dumps({
+            'id': self.next_request_id,
+            'method': 'Network.enable'
+        }))
+        await self.websocket.recv()
 
     async def set_user_agent(self, ua):
         await self.websocket.send(json.dumps({

@@ -40,6 +40,7 @@ async def prerender(url):
     # tab = tabs[0]
     tab = await rdp.new_tab()
     await tab.attach()
+    await tab.set_user_agent('Mozilla/5.0 (Linux) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/59.0.3033.0 Safari/537.36 Prerender (bosondata)')  # NOQA
     await tab.navigate(url)
     html = await tab.wait()
     await tab.close()
