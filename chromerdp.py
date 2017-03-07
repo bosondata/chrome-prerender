@@ -30,7 +30,7 @@ class ChromeRemoteDebugger:
 
     async def close_tab(self, tab_id):
         async with self._session.get('{}/json/close/{}'.format(self._debugger_url, tab_id)) as res:
-            return await res.json(loads=json.loads)
+            return await res.text()
 
     def __del__(self):
         self._session.close()
@@ -85,6 +85,7 @@ class Tab:
     async def wait(self):
         while True:
             message = await self.websocket.recv()
+            logger.debug(message)
             obj = json.loads(message)
             method = obj.get('method')
             if method == 'Page.loadEventFired':
@@ -111,9 +112,6 @@ class Tab:
 
     async def close(self):
         return await self._debugger.close_tab(self.id)
-
-    def __del__(self):
-        self.websocket.close()
 
     def __repr__(self):
         return '<Tab #{}>'.format(self.id)
