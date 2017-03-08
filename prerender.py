@@ -4,16 +4,13 @@ import sys
 import asyncio
 import logging
 import logging.config
-from signal import signal, SIGINT
 
-import uvloop
-import ujson as json
 from sanic import Sanic
 from sanic import response
 from sanic.exceptions import NotFound
 from async_timeout import timeout
 
-from chromerdp import ChromeRemoteDebugger, Tab
+from chromerdp import ChromeRemoteDebugger
 
 LOGGING = {
     'version': 1,
@@ -73,7 +70,7 @@ class Prerender:
             'method': 'Target.closeTarget',
             'params': {'targetId': tab_id}
         })
-        res = await self._ctrl_tab.recv()
+        return await self._ctrl_tab.recv()
 
     async def close(self):
         tabs = await self._rdp.tabs()
