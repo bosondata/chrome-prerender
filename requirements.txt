@@ -2,3 +2,4 @@ websockets
 aiohttp
 ujson
 sanic
+async-timeout

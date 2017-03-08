@@ -7,6 +7,7 @@ import logging.config
 from sanic import Sanic
 from sanic import response
 from sanic.exceptions import NotFound
+from async_timeout import timeout
 
 from chromerdp import ChromeRemoteDebugger
 
@@ -41,9 +42,12 @@ async def prerender(url):
     tab = await rdp.new_tab()
     await tab.attach()
     await tab.set_user_agent('Mozilla/5.0 (Linux) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/59.0.3033.0 Safari/537.36 Prerender (bosondata)')  # NOQA
-    await tab.navigate(url)
-    html = await tab.wait()
-    await tab.close()
+    try:
+        await tab.navigate(url)
+        with timeout(30):
+            html = await tab.wait()
+    finally:
+        await tab.close()
     return html
 
 
@@ -55,8 +59,11 @@ async def handle_request(request, exception):
     url = request.url
     if url.startswith('/http'):
         url = url[1:]
-    html = await prerender(url)
-    return response.text(html)
+    try:
+        html = await prerender(url)
+        return response.text(html)
+    except asyncio.TimeoutError:
+        return response.text('Gateway timeout', status=504)
 
 
 if __name__ == '__main__':

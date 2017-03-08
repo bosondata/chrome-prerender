@@ -87,10 +87,17 @@ class Tab:
         }))
         await self.websocket.recv()
 
+    async def evaluate(self, expr):
+        await self.websocket.send(json.dumps({
+            'id': self.next_request_id,
+            'method': 'Runtime.evaluate',
+            'params': {'expression': expr}
+        }))
+
     async def wait(self):
         while True:
+            # await self.evaluate('window.prerenderReady === true')
             message = await self.websocket.recv()
-            logger.debug(message)
             obj = json.loads(message)
             method = obj.get('method')
             if method == 'Page.loadEventFired':
