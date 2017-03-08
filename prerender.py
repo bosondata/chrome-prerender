@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import os
 import sys
 import asyncio
 import logging
@@ -35,6 +36,7 @@ LOGGING = {
 }
 logging.config.dictConfig(LOGGING)
 logger = logging.getLogger(__name__)
+PRERENDER_TIMEOUT = int(os.environ.get('PRERENDER_TIMEOUT', 30))
 
 
 class Prerender:
@@ -70,7 +72,9 @@ class Prerender:
             'method': 'Target.closeTarget',
             'params': {'targetId': tab_id}
         })
-        return await self._ctrl_tab.recv()
+        res = await self._ctrl_tab.recv()
+        logger.info('Closed tab %s', tab_id)
+        return res
 
     async def close(self):
         tabs = await self._rdp.tabs()
@@ -86,7 +90,7 @@ async def prerender(renderer, url):
     await tab.set_user_agent('Mozilla/5.0 (Linux) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/59.0.3033.0 Safari/537.36 Prerender (bosondata)')  # NOQA
     try:
         await tab.navigate(url)
-        with timeout(30):
+        with timeout(PRERENDER_TIMEOUT):
             html = await tab.wait()
     finally:
         await renderer.close_tab(tab.id)
@@ -103,9 +107,14 @@ async def handle_request(request, exception):
         url = url[1:]
     try:
         html = await prerender(request.app.prerender, url)
+        logger.info('Got 200 for %s', url)
         return response.text(html)
     except asyncio.TimeoutError:
+        logger.warning('Got 504 for %s', url)
         return response.text('Gateway timeout', status=504)
+    except Exception:
+        logger.exception('Internal Server Error for %s', url)
+        return response.text('Internal Server Error', status=500)
 
 
 @app.listener('after_server_start')
