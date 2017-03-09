@@ -1,6 +1,6 @@
 import os
 import time
-import zlib
+import lzma
 import asyncio
 import logging
 from urllib.parse import urlparse
@@ -93,7 +93,7 @@ def _get_cache_file_path(parsed_url):
 
 async def _fetch_from_cache(path, loop):
     async with aiofiles.open(path, mode='rb', executor=executor) as f:
-        res = await loop.run_in_executor(executor, zlib.decompress, await f.read())
+        res = await loop.run_in_executor(executor, lzma.decompress, await f.read())
         return res.decode('utf-8')
 
 
@@ -104,7 +104,7 @@ def _save_to_cache(path, html):
     except OSError:
         pass
     try:
-        compressed = zlib.compress(html.encode('utf-8'))
+        compressed = lzma.compress(html.encode('utf-8'))
         with open(path, mode='wb') as f:
             f.write(compressed)
     except Exception:
