@@ -1,4 +1,5 @@
 import os
+import time
 import asyncio
 import logging
 from urllib.parse import urlparse
@@ -89,15 +90,20 @@ async def handle_request(request, exception):
 
     if request.query_string:
         url = url + '?' + request.query_string
+
+    start_time = time.time()
     try:
         html = await prerender(request.app.prerender, url)
-        logger.info('Got 200 for %s', url)
+        duration_ms = int((time.time() - start_time) * 1000)
+        logger.info('Got 200 for %s in %dms', url, duration_ms)
         return response.text(html)
     except asyncio.TimeoutError:
-        logger.warning('Got 504 for %s', url)
+        duration_ms = int((time.time() - start_time) * 1000)
+        logger.warning('Got 504 for %s in %dms', url, duration_ms)
         return response.text('Gateway timeout', status=504)
     except Exception:
-        logger.exception('Internal Server Error for %s', url)
+        duration_ms = int((time.time() - start_time) * 1000)
+        logger.exception('Internal Server Error for %s in %dms', url, duration_ms)
         return response.text('Internal Server Error', status=500)
 
 
