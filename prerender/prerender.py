@@ -141,6 +141,7 @@ async def handle_request(request, exception):
     try:
         if await _is_cache_valid(cache_path):
             html = await _fetch_from_cache(cache_path, request.app.loop)
+            logger.info('Got 200 for %s in cache', url)
             return response.html(html, headers={'X-Prerender-Cache': 'hit'})
     except Exception:
         logger.exception('Error reading cache')
