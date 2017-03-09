@@ -1,9 +1,14 @@
 import os
 import time
+import zlib
 import asyncio
 import logging
 from urllib.parse import urlparse
+from concurrent.futures import ThreadPoolExecutor
+from multiprocessing import cpu_count
 
+import aiofiles
+import aiofiles.os
 from sanic import Sanic
 from sanic import response
 from sanic.exceptions import NotFound
@@ -12,8 +17,12 @@ from async_timeout import timeout
 from .chromerdp import ChromeRemoteDebugger
 
 logger = logging.getLogger(__name__)
+executor = ThreadPoolExecutor(max_workers=cpu_count())
+
 PRERENDER_TIMEOUT = int(os.environ.get('PRERENDER_TIMEOUT', 30))
 ALLOWED_DOMAINS = set(dm.strip() for dm in os.environ.get('PRERENDER_ALLOWED_DOMAINS', '').split(',') if dm.strip())
+CACHE_ROOT_DIR = os.environ.get('CACHE_ROOT_DIR', '/tmp/prerender')
+CACHE_LIVE_TIME = int(os.environ.get('CACHE_LIVE_TIME', 3600))
 
 
 class Prerender:
@@ -74,6 +83,44 @@ async def prerender(renderer, url):
     return html
 
 
+def _get_cache_file_path(parsed_url):
+    path = parsed_url.hostname
+    path = os.path.join(path, os.path.normpath(parsed_url.path[1:]))
+    if parsed_url.query:
+        path = os.path.join(path, os.path.normpath(parsed_url.query))
+    return os.path.join(CACHE_ROOT_DIR, path, 'prerender.cache.html')
+
+
+async def _fetch_from_cache(path, loop):
+    async with aiofiles.open(path, mode='rb', executor=executor) as f:
+        res = await loop.run_in_executor(executor, zlib.decompress, await f.read())
+        return res.decode('utf-8')
+
+
+def _save_to_cache(path, html):
+    save_dir = os.path.dirname(path)
+    try:
+        os.makedirs(save_dir, 0o755)
+    except OSError:
+        pass
+    try:
+        compressed = zlib.compress(html.encode('utf-8'))
+        with open(path, mode='wb') as f:
+            f.write(compressed)
+    except Exception:
+        logger.exception('Error writing cache')
+
+
+async def _is_cache_valid(path):
+    if not os.path.exists(path):
+        return False
+
+    stat = await aiofiles.os.stat(path, executor=executor)
+    if time.time() - stat.st_mtime <= CACHE_LIVE_TIME:
+        return True
+    return False
+
+
 app = Sanic(__name__)
 
 
@@ -82,21 +129,29 @@ async def handle_request(request, exception):
     url = request.url
     if url.startswith('/http'):
         url = url[1:]
+    if request.query_string:
+        url = url + '?' + request.query_string
+    parsed_url = urlparse(url)
 
     if ALLOWED_DOMAINS:
-        parsed_url = urlparse(url)
         if parsed_url.hostname not in ALLOWED_DOMAINS:
             return response.text('Forbiden', status=403)
 
-    if request.query_string:
-        url = url + '?' + request.query_string
+    cache_path = _get_cache_file_path(parsed_url)
+    try:
+        if await _is_cache_valid(cache_path):
+            html = await _fetch_from_cache(cache_path, request.app.loop)
+            return response.html(html, headers={'X-Prerender-Cache': 'hit'})
+    except Exception:
+        logger.exception('Error reading cache')
 
     start_time = time.time()
     try:
         html = await prerender(request.app.prerender, url)
         duration_ms = int((time.time() - start_time) * 1000)
         logger.info('Got 200 for %s in %dms', url, duration_ms)
-        return response.text(html)
+        executor.submit(_save_to_cache, cache_path, html)
+        return response.html(html, headers={'X-Prerender-Cache': 'miss'})
     except asyncio.TimeoutError:
         duration_ms = int((time.time() - start_time) * 1000)
         logger.warning('Got 504 for %s in %dms', url, duration_ms)
