@@ -1,10 +1,6 @@
-#!/usr/bin/env python
-
 import os
-import sys
 import asyncio
 import logging
-import logging.config
 from urllib.parse import urlparse
 
 from sanic import Sanic
@@ -12,34 +8,11 @@ from sanic import response
 from sanic.exceptions import NotFound
 from async_timeout import timeout
 
-from chromerdp import ChromeRemoteDebugger
+from .chromerdp import ChromeRemoteDebugger
 
-DEBUG = os.environ.get('DEBUG', 'false').lower() in ('true', 'yes', '1')
-LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'root': {
-        'handlers': ['console'],
-        'level': 'DEBUG' if DEBUG else 'INFO'
-    },
-    'handlers': {
-        'console': {
-            'level': 'DEBUG' if DEBUG else 'INFO',
-            'class': 'logging.StreamHandler',
-            'formatter': 'default',
-            'stream': sys.stderr,
-        }
-    },
-    'formatters': {
-        'default': {
-            'format': '%(asctime)s %(levelname)-2s %(name)s.%(funcName)s:%(lineno)-5d %(message)s',  # NOQA
-        },
-    },
-}
-logging.config.dictConfig(LOGGING)
 logger = logging.getLogger(__name__)
 PRERENDER_TIMEOUT = int(os.environ.get('PRERENDER_TIMEOUT', 30))
-ALLOWED_DOMAINS = set(os.environ.get('PRERENDER_ALLOWED_DOMAINS', '').split(','))
+ALLOWED_DOMAINS = set(dm.strip() for dm in os.environ.get('PRERENDER_ALLOWED_DOMAINS', '').split(',') if dm.strip())
 
 
 class Prerender:
@@ -129,7 +102,3 @@ async def handle_request(request, exception):
 def after_server_start(app, loop):
     app.prerender = Prerender(loop=loop)
     loop.run_until_complete(app.prerender.connect())
-
-
-if __name__ == '__main__':
-    app.run(host="0.0.0.0", port=8000, debug=DEBUG)
