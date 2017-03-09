@@ -86,6 +86,9 @@ async def handle_request(request, exception):
         parsed_url = urlparse(url)
         if parsed_url.hostname not in ALLOWED_DOMAINS:
             return response.text('Forbiden', status=403)
+
+    if request.query_string:
+        url = url + '?' + request.query_string
     try:
         html = await prerender(request.app.prerender, url)
         logger.info('Got 200 for %s', url)
