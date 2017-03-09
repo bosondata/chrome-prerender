@@ -3,3 +3,4 @@ aiohttp
 ujson
 sanic
 async-timeout
+aiofiles
