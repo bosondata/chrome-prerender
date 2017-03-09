@@ -5,6 +5,7 @@ import sys
 import asyncio
 import logging
 import logging.config
+from urllib.parse import urlparse
 
 from sanic import Sanic
 from sanic import response
@@ -13,16 +14,17 @@ from async_timeout import timeout
 
 from chromerdp import ChromeRemoteDebugger
 
+DEBUG = os.environ.get('DEBUG', 'false').lower() in ('true', 'yes', '1')
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
     'root': {
         'handlers': ['console'],
-        'level': 'DEBUG'
+        'level': 'DEBUG' if DEBUG else 'INFO'
     },
     'handlers': {
         'console': {
-            'level': 'DEBUG',
+            'level': 'DEBUG' if DEBUG else 'INFO',
             'class': 'logging.StreamHandler',
             'formatter': 'default',
             'stream': sys.stderr,
@@ -37,6 +39,7 @@ LOGGING = {
 logging.config.dictConfig(LOGGING)
 logger = logging.getLogger(__name__)
 PRERENDER_TIMEOUT = int(os.environ.get('PRERENDER_TIMEOUT', 30))
+ALLOWED_DOMAINS = set(os.environ.get('PRERENDER_ALLOWED_DOMAINS', '').split(','))
 
 
 class Prerender:
@@ -105,6 +108,11 @@ async def handle_request(request, exception):
     url = request.url
     if url.startswith('/http'):
         url = url[1:]
+
+    if ALLOWED_DOMAINS:
+        parsed_url = urlparse(url)
+        if parsed_url.hostname not in ALLOWED_DOMAINS:
+            return response.text('Forbiden', status=403)
     try:
         html = await prerender(request.app.prerender, url)
         logger.info('Got 200 for %s', url)
@@ -124,4 +132,4 @@ def after_server_start(app, loop):
 
 
 if __name__ == '__main__':
-    app.run(host="0.0.0.0", port=8000, debug=True)
+    app.run(host="0.0.0.0", port=8000, debug=DEBUG)
