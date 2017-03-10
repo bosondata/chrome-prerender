@@ -133,6 +133,9 @@ async def handle_request(request, exception):
         url = url + '?' + request.query_string
     parsed_url = urlparse(url)
 
+    if not parsed_url.hostname:
+        return response.text('Bad Request', status=400)
+
     if ALLOWED_DOMAINS:
         if parsed_url.hostname not in ALLOWED_DOMAINS:
             return response.text('Forbiden', status=403)
