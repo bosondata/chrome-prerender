@@ -19,7 +19,11 @@ class ChromeRemoteDebugger:
     async def tabs(self):
         async with self._session.get('{}/json/list'.format(self._debugger_url)) as res:
             tabs = await res.json(loads=json.loads)
-            return [Tab(self, tab, loop=self.loop) for tab in tabs if 'webSocketDebuggerUrl' in tab]
+            return tabs
+
+    async def debuggable_tabs(self):
+        tabs = await self.tabs()
+        return [Tab(self, tab, loop=self.loop) for tab in tabs if 'webSocketDebuggerUrl' in tab]
 
     async def new_tab(self, url=None):
         endpoint = '{}/json/new'.format(self._debugger_url)
@@ -121,7 +125,7 @@ class Tab:
             if method == 'Page.loadEventFired':
                 self._load_event_fired = True
             if not self._prerender_ready and self._load_event_fired:
-                await self.evaluate('window.prerenderReady === true')
+                await self.evaluate('window.prerenderReady == true')
                 await asyncio.sleep(0.5)
             req_id = obj.get('id')
             if req_id is None:

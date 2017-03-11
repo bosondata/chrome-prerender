@@ -34,10 +34,13 @@ class Prerender:
         self._ctrl_tab = None
 
     async def connect(self):
-        tabs = await self._rdp.tabs()
+        tabs = await self._rdp.debuggable_tabs()
         self._ctrl_tab = tabs[0]
         await self._ctrl_tab.attach()
         logger.info('Connected to control tab %s', self._ctrl_tab.id)
+
+    async def tabs(self):
+        return await self._rdp.tabs()
 
     async def new_tab(self, url=None):
         await self._ctrl_tab.send({
@@ -49,7 +52,7 @@ class Prerender:
         res = await self._ctrl_tab.recv()
         tab_id = res['result']['targetId']
         logger.info('Created new tab %s', tab_id)
-        tabs = await self._rdp.tabs()
+        tabs = await self._rdp.debuggable_tabs()
         tab = [tb for tb in tabs if tb.id == tab_id][0]
         return tab
 
@@ -61,12 +64,6 @@ class Prerender:
         res = await self._ctrl_tab.recv()
         logger.info('Closed tab %s', tab_id)
         return res
-
-    async def close(self):
-        tabs = await self._rdp.tabs()
-        for tab in tabs:
-            await tab.close()
-        logger.info('All tabs closed')
 
 
 async def prerender(renderer, url):
@@ -122,6 +119,13 @@ async def _is_cache_valid(path):
 
 
 app = Sanic(__name__)
+
+
+@app.route('/browser/list')
+async def list_browser_tabs(request):
+    renderer = request.app.prerender
+    tabs = await renderer.tabs()
+    return response.json(tabs, ensure_ascii=False, indent=2, escape_forward_slashes=False)
 
 
 @app.exception(NotFound)
