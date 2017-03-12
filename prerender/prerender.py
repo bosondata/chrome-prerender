@@ -171,6 +171,6 @@ async def handle_request(request, exception):
 
 
 @app.listener('after_server_start')
-def after_server_start(app, loop):
+async def after_server_start(app, loop):
     app.prerender = Prerender(loop=loop)
-    loop.run_until_complete(app.prerender.connect())
+    await app.prerender.connect()
