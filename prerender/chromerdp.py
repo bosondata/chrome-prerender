@@ -50,6 +50,9 @@ class Tab:
         self.loop = loop
         self.id = tab_info['id']
         self.websocket_debugger_url = tab_info['webSocketDebuggerUrl']
+        self._reset()
+
+    def _reset(self):
         self.websocket = None
         self._request_id = 0
         self._get_html_request_id = -1
@@ -68,7 +71,8 @@ class Tab:
         self.websocket = await websockets.connect(self.websocket_debugger_url, loop=self.loop)
 
     async def dettach(self):
-        return await self.websocket.close()
+        await self.websocket.close()
+        self._reset()
 
     async def listen(self):
         await self.send({
