@@ -40,7 +40,7 @@ class Prerender:
         self.loop = loop
         self._rdp = ChromeRemoteDebugger(host, port, loop=loop)
         self._ctrl_tab = None
-        self._idle_tabs = asyncio.Queue(loop=self.loop)
+        self._idle_tabs = asyncio.Queue(CONCURRENCY_PER_WORKER, loop=self.loop)
 
     async def connect(self):
         tabs = await self._rdp.debuggable_tabs()
@@ -91,13 +91,17 @@ class Prerender:
 
     async def render(self, url):
         tab = await self._idle_tabs.get()
+        logger.debug('qsize after get: %d', self._idle_tabs.qsize())
         await tab.attach()
         await tab.listen()
         await tab.navigate(url)
         html = await tab.wait()
         await tab.dettach()
+        logger.debug('qsize before task_done: %d', self._idle_tabs.qsize())
         self._idle_tabs.task_done()
+        logger.debug('qsize before put: %d', self._idle_tabs.qsize())
         await self._idle_tabs.put(tab)
+        logger.debug('qsize after put: %d', self._idle_tabs.qsize())
         return html
 
 
