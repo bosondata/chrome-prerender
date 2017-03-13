@@ -23,6 +23,7 @@ PRERENDER_TIMEOUT = int(os.environ.get('PRERENDER_TIMEOUT', 30))
 ALLOWED_DOMAINS = set(dm.strip() for dm in os.environ.get('PRERENDER_ALLOWED_DOMAINS', '').split(',') if dm.strip())
 CACHE_ROOT_DIR = os.environ.get('CACHE_ROOT_DIR', '/tmp/prerender')
 CACHE_LIVE_TIME = int(os.environ.get('CACHE_LIVE_TIME', 3600))
+CONCURRENCY_PER_WORKER = int(os.environ.get('CONCURRENCY', cpu_count() * 2))
 
 
 class Prerender:
@@ -155,7 +156,8 @@ async def handle_request(request, exception):
 
     start_time = time.time()
     try:
-        html = await prerender(request.app.prerender, url)
+        async with request.app.semaphore:
+            html = await prerender(request.app.prerender, url)
         duration_ms = int((time.time() - start_time) * 1000)
         logger.info('Got 200 for %s in %dms', url, duration_ms)
         executor.submit(_save_to_cache, cache_path, html)
@@ -173,4 +175,5 @@ async def handle_request(request, exception):
 @app.listener('after_server_start')
 async def after_server_start(app, loop):
     app.prerender = Prerender(loop=loop)
+    app.semaphore = asyncio.Semaphore(CONCURRENCY_PER_WORKER, loop=loop)
     await app.prerender.connect()
