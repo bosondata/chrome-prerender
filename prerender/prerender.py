@@ -70,9 +70,9 @@ class Prerender:
 async def prerender(renderer, url):
     tab = await renderer.new_tab()
     await tab.attach()
-    await tab.listen()
-    await tab.set_user_agent('Mozilla/5.0 (Linux) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/59.0.3033.0 Safari/537.36 Prerender (bosondata)')  # NOQA
     try:
+        await tab.listen()
+        await tab.set_user_agent('Mozilla/5.0 (Linux) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/59.0.3033.0 Safari/537.36 Prerender (bosondata)')  # NOQA
         await tab.navigate(url)
         with timeout(PRERENDER_TIMEOUT):
             html = await tab.wait()
