@@ -182,6 +182,11 @@ async def handle_request(request, exception):
     except Exception:
         logger.exception('Error reading cache')
 
+    if CONCURRENCY_PER_WORKER <= 0:
+        # Read from cache only
+        logger.warning('Got 502 for %s, prerender unavailable', url)
+        return response.text('Bad Gateway', status=502)
+
     start_time = time.time()
     try:
         html = await request.app.prerender.render(url)
@@ -204,9 +209,11 @@ async def handle_request(request, exception):
 @app.listener('after_server_start')
 async def after_server_start(app, loop):
     app.prerender = Prerender(loop=loop)
-    await app.prerender.connect()
+    if CONCURRENCY_PER_WORKER > 0:
+        await app.prerender.connect()
 
 
 @app.listener('after_server_stop')
 async def after_server_stop(app, loop):
-    await app.prerender.shutdown()
+    if CONCURRENCY_PER_WORKER > 0:
+        await app.prerender.shutdown()
