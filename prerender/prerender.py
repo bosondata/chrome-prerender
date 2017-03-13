@@ -40,12 +40,23 @@ class Prerender:
         self.loop = loop
         self._rdp = ChromeRemoteDebugger(host, port, loop=loop)
         self._ctrl_tab = None
+        self._idle_tabs = asyncio.Queue(loop=self.loop)
 
     async def connect(self):
         tabs = await self._rdp.debuggable_tabs()
         self._ctrl_tab = tabs[0]
         await self._ctrl_tab.attach()
         logger.info('Connected to control tab %s', self._ctrl_tab.id)
+        for i in range(CONCURRENCY_PER_WORKER):
+            await self._ctrl_tab.send({
+                'method': 'Target.createTarget',
+                'params': {
+                    'url': 'about:blank'
+                }
+            })
+            await self._ctrl_tab.recv()
+        for tab in await self._rdp.debuggable_tabs():
+            await self._idle_tabs.put(tab)
 
     async def tabs(self):
         return await self._rdp.tabs()
@@ -73,20 +84,21 @@ class Prerender:
         logger.info('Closed tab %s', tab_id)
         return res
 
+    async def shutdown(self):
+        tabs = await self._rdp.debuggable_tabs()
+        for tab in tabs:
+            await self.close_tab(tab.id)
 
-async def prerender(renderer, url):
-    tab = await renderer.new_tab()
-    await tab.attach()
-    try:
+    async def render(self, url):
+        tab = await self._idle_tabs.get()
+        await tab.attach()
         await tab.listen()
-        await tab.set_user_agent('Mozilla/5.0 (Linux) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/59.0.3033.0 Safari/537.36 Prerender (bosondata)')  # NOQA
         await tab.navigate(url)
-        with timeout(PRERENDER_TIMEOUT):
-            html = await tab.wait()
-    finally:
+        html = await tab.wait()
         await tab.dettach()
-        await renderer.close_tab(tab.id)
-    return html
+        self._idle_tabs.task_done()
+        await self._idle_tabs.put(tab)
+        return html
 
 
 def _get_cache_file_path(parsed_url):
@@ -164,8 +176,8 @@ async def handle_request(request, exception):
 
     start_time = time.time()
     try:
-        async with request.app.semaphore:
-            html = await prerender(request.app.prerender, url)
+        with timeout(PRERENDER_TIMEOUT):
+            html = await request.app.prerender.render(url)
         duration_ms = int((time.time() - start_time) * 1000)
         logger.info('Got 200 for %s in %dms', url, duration_ms)
         executor.submit(_save_to_cache, cache_path, html)
@@ -185,5 +197,9 @@ async def handle_request(request, exception):
 @app.listener('after_server_start')
 async def after_server_start(app, loop):
     app.prerender = Prerender(loop=loop)
-    app.semaphore = asyncio.Semaphore(CONCURRENCY_PER_WORKER, loop=loop)
     await app.prerender.connect()
+
+
+@app.listener('after_server_stop')
+async def after_server_stop(app, loop):
+    await app.prerender.shutdown()
