@@ -67,8 +67,8 @@ class Tab:
         logger.info('Connecting to %s', self.websocket_debugger_url)
         self.websocket = await websockets.connect(self.websocket_debugger_url, loop=self.loop)
 
-    def dettach(self):
-        self.websocket.close()
+    async def dettach(self):
+        return await self.websocket.close()
 
     async def listen(self):
         await self.send({

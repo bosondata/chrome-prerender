@@ -77,6 +77,7 @@ async def prerender(renderer, url):
         with timeout(PRERENDER_TIMEOUT):
             html = await tab.wait()
     finally:
+        await tab.dettach()
         await renderer.close_tab(tab.id)
     return html
 
