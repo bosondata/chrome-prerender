@@ -92,16 +92,20 @@ class Prerender:
     async def render(self, url):
         tab = await self._idle_tabs.get()
         logger.debug('qsize after get: %d', self._idle_tabs.qsize())
-        await tab.attach()
-        await tab.listen()
-        await tab.navigate(url)
-        html = await tab.wait()
-        await tab.dettach()
-        logger.debug('qsize before task_done: %d', self._idle_tabs.qsize())
-        self._idle_tabs.task_done()
-        logger.debug('qsize before put: %d', self._idle_tabs.qsize())
-        await self._idle_tabs.put(tab)
-        logger.debug('qsize after put: %d', self._idle_tabs.qsize())
+        try:
+            await tab.attach()
+            await tab.listen()
+            await tab.navigate(url)
+            with timeout(PRERENDER_TIMEOUT):
+                html = await tab.wait()
+        finally:
+            if tab.websocket:
+                await tab.dettach()
+            logger.debug('qsize before task_done: %d', self._idle_tabs.qsize())
+            self._idle_tabs.task_done()
+            logger.debug('qsize before put: %d', self._idle_tabs.qsize())
+            await self._idle_tabs.put(tab)
+            logger.debug('qsize after put: %d', self._idle_tabs.qsize())
         return html
 
 
@@ -180,8 +184,7 @@ async def handle_request(request, exception):
 
     start_time = time.time()
     try:
-        with timeout(PRERENDER_TIMEOUT):
-            html = await request.app.prerender.render(url)
+        html = await request.app.prerender.render(url)
         duration_ms = int((time.time() - start_time) * 1000)
         logger.info('Got 200 for %s in %dms', url, duration_ms)
         executor.submit(_save_to_cache, cache_path, html)
