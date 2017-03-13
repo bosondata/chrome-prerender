@@ -163,7 +163,7 @@ async def handle_request(request, exception):
         logger.info('Got 200 for %s in %dms', url, duration_ms)
         executor.submit(_save_to_cache, cache_path, html)
         return response.html(html, headers={'X-Prerender-Cache': 'miss'})
-    except asyncio.TimeoutError:
+    except (asyncio.TimeoutError, asyncio.CancelledError):
         duration_ms = int((time.time() - start_time) * 1000)
         logger.warning('Got 504 for %s in %dms', url, duration_ms)
         return response.text('Gateway timeout', status=504)
