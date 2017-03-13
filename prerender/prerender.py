@@ -13,6 +13,8 @@ from sanic import Sanic
 from sanic import response
 from sanic.exceptions import NotFound
 from async_timeout import timeout
+from raven import Client
+from raven_aiohttp import AioHttpTransport
 
 from .chromerdp import ChromeRemoteDebugger
 
@@ -24,6 +26,11 @@ ALLOWED_DOMAINS = set(dm.strip() for dm in os.environ.get('PRERENDER_ALLOWED_DOM
 CACHE_ROOT_DIR = os.environ.get('CACHE_ROOT_DIR', '/tmp/prerender')
 CACHE_LIVE_TIME = int(os.environ.get('CACHE_LIVE_TIME', 3600))
 CONCURRENCY_PER_WORKER = int(os.environ.get('CONCURRENCY', cpu_count() * 2))
+SENTRY_DSN = os.environ.get('SENTRY_DSN')
+if SENTRY_DSN:
+    sentry = Client(SENTRY_DSN, transport=AioHttpTransport)
+else:
+    sentry = None
 
 
 class Prerender:
@@ -170,6 +177,8 @@ async def handle_request(request, exception):
     except Exception:
         duration_ms = int((time.time() - start_time) * 1000)
         logger.exception('Internal Server Error for %s in %dms', url, duration_ms)
+        if sentry:
+            sentry.captureException()
         return response.text('Internal Server Error', status=500)
 
 
