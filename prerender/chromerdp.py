@@ -23,7 +23,8 @@ class ChromeRemoteDebugger:
 
     async def debuggable_tabs(self):
         tabs = await self.tabs()
-        return [Tab(self, tab, loop=self.loop) for tab in tabs if 'webSocketDebuggerUrl' in tab]
+        return [Tab(self, tab, loop=self.loop) for tab in tabs
+                if 'webSocketDebuggerUrl' in tab and tab['type'] == 'page']
 
     async def new_tab(self, url=None):
         endpoint = '{}/json/new'.format(self._debugger_url)

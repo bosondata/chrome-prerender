@@ -55,6 +55,7 @@ class Prerender:
                 }
             })
             await self._ctrl_tab.recv()
+
         for tab in await self._rdp.debuggable_tabs():
             await self._idle_tabs.put(tab)
 
@@ -117,7 +118,8 @@ def _get_cache_file_path(parsed_url):
     return os.path.join(CACHE_ROOT_DIR, path, 'prerender.cache.html')
 
 
-async def _fetch_from_cache(path, loop):
+async def _fetch_from_cache(path):
+    loop = asyncio.get_event_loop()
     async with aiofiles.open(path, mode='rb', executor=executor) as f:
         res = await loop.run_in_executor(executor, lzma.decompress, await f.read())
         return res.decode('utf-8')
@@ -159,7 +161,8 @@ async def list_browser_tabs(request):
 
 @app.exception(NotFound)
 async def handle_request(request, exception):
-    url = request.url
+    # compatible with Sanic 0.4.1+
+    url = getattr(request, 'path', request.url)
     if url.startswith('/http'):
         url = url[1:]
     if request.query_string:
@@ -176,7 +179,7 @@ async def handle_request(request, exception):
     cache_path = _get_cache_file_path(parsed_url)
     try:
         if await _is_cache_valid(cache_path):
-            html = await _fetch_from_cache(cache_path, request.app.loop)
+            html = await _fetch_from_cache(cache_path)
             logger.info('Got 200 for %s in cache', url)
             return response.html(html, headers={'X-Prerender-Cache': 'hit'})
     except Exception:
