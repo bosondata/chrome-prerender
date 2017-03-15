@@ -21,7 +21,7 @@ from .prerender import Prerender, CONCURRENCY_PER_WORKER
 
 
 logger = logging.getLogger(__name__)
-executor = ThreadPoolExecutor(max_workers=cpu_count())
+executor = ThreadPoolExecutor(max_workers=max(cpu_count(), 5))
 
 ALLOWED_DOMAINS = set(dm.strip() for dm in os.environ.get('PRERENDER_ALLOWED_DOMAINS', '').split(',') if dm.strip())
 CACHE_ROOT_DIR = os.environ.get('CACHE_ROOT_DIR', '/tmp/prerender')
@@ -43,8 +43,8 @@ def _get_cache_file_path(parsed_url):
 
 async def _fetch_from_cache(path):
     loop = asyncio.get_event_loop()
-    async with aiofiles.open(path, mode='rb', executor=executor) as f:
-        res = await loop.run_in_executor(executor, lzma.decompress, await f.read())
+    async with aiofiles.open(path, mode='rb') as f:
+        res = await loop.run_in_executor(None, lzma.decompress, await f.read())
         return res.decode('utf-8')
 
 
@@ -66,7 +66,7 @@ async def _is_cache_valid(path):
     if not os.path.exists(path):
         return False
 
-    stat = await aiofiles.os.stat(path, executor=executor)
+    stat = await aiofiles.os.stat(path)
     if time.time() - stat.st_mtime <= CACHE_LIVE_TIME:
         return True
     return False
@@ -134,6 +134,8 @@ async def handle_request(request, exception):
 
 @app.listener('before_server_start')
 def before_server_start(app, loop):
+    loop.set_default_executor(executor)
+
     logging_config = {
         'version': 1,
         'disable_existing_loggers': False,
