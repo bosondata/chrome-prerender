@@ -69,6 +69,7 @@ class Prerender:
         tabs = await self._rdp.debuggable_tabs()
         for tab in tabs:
             await self.close_tab(tab.id)
+        await self._ctrl_tab.dettach()
 
     async def render(self, url):
         tab = await self._idle_tabs.get()
