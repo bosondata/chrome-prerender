@@ -133,7 +133,7 @@ async def handle_request(request, exception):
 
 
 @app.listener('before_server_start')
-def before_server_start(app, loop):
+async def before_server_start(app, loop):
     loop.set_default_executor(executor)
 
     logging_config = {
@@ -159,9 +159,6 @@ def before_server_start(app, loop):
     }
     logging.config.dictConfig(logging_config)
 
-
-@app.listener('after_server_start')
-async def after_server_start(app, loop):
     app.prerender = Prerender(loop=loop)
     if CONCURRENCY_PER_WORKER > 0:
         await app.prerender.connect()
