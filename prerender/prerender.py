@@ -73,19 +73,16 @@ class Prerender:
 
     async def render(self, url):
         tab = await self._idle_tabs.get()
-        logger.debug('qsize after get: %d', self._idle_tabs.qsize())
         try:
             await tab.attach()
             await tab.listen()
             await tab.navigate(url)
             with timeout(PRERENDER_TIMEOUT):
                 html = await tab.wait()
+            await tab.navigate('about:blank')
         finally:
             if tab.websocket:
                 await tab.dettach()
-            logger.debug('qsize before task_done: %d', self._idle_tabs.qsize())
             self._idle_tabs.task_done()
-            logger.debug('qsize before put: %d', self._idle_tabs.qsize())
             await self._idle_tabs.put(tab)
-            logger.debug('qsize after put: %d', self._idle_tabs.qsize())
         return html

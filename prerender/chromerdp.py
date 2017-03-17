@@ -51,6 +51,7 @@ class Tab:
         self.loop = loop
         self.id = tab_info['id']
         self.websocket_debugger_url = tab_info['webSocketDebuggerUrl']
+        self.iteration = 0
         self._reset()
 
     def _reset(self):
@@ -104,6 +105,7 @@ class Tab:
         await self.recv()
 
     async def navigate(self, url):
+        self.iteration += 1
         await self.send({
             'method': 'Page.navigate',
             'params': {'url': url}
