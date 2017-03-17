@@ -105,7 +105,8 @@ class Tab:
         await self.recv()
 
     async def navigate(self, url):
-        self.iteration += 1
+        if url != 'about:blank':
+            self.iteration += 1
         await self.send({
             'method': 'Page.navigate',
             'params': {'url': url}
