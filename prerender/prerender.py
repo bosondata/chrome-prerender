@@ -20,7 +20,7 @@ class Prerender:
         self.loop = loop
         self._rdp = ChromeRemoteDebugger(host, port, loop=loop)
         self._ctrl_tab = None
-        self._idle_tabs = asyncio.Queue(CONCURRENCY_PER_WORKER, loop=self.loop)
+        self._idle_tabs = asyncio.Queue(loop=self.loop)
 
     async def connect(self):
         tabs = await self._rdp.debuggable_tabs()
