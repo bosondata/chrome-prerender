@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 
 PRERENDER_TIMEOUT = int(os.environ.get('PRERENDER_TIMEOUT', 30))
 CONCURRENCY_PER_WORKER = int(os.environ.get('CONCURRENCY', cpu_count() * 2))
+MAX_ITERATIONS = int(os.environ.get('ITERATIONS', 200))
 
 
 class Prerender:
@@ -84,5 +85,23 @@ class Prerender:
             if tab.websocket:
                 await tab.dettach()
             self._idle_tabs.task_done()
-            await self._idle_tabs.put(tab)
+            await self.manage_tab(tab)
         return html
+
+    async def manage_tab(self, tab):
+        if tab.iteration < MAX_ITERATIONS:
+            await self._idle_tabs.put(tab)
+            return
+
+        await self.close_tab(tab.id)
+        await self._ctrl_tab.send({
+            'method': 'Target.createTarget',
+            'params': {
+                'url': 'about:blank'
+            }
+        })
+        await self._ctrl_tab.recv()
+        await asyncio.sleep(0.5)
+        for tab in await self._rdp.debuggable_tabs():
+            await self._idle_tabs.put(tab)
+            logger.info('New tab %s added', tab.id)
