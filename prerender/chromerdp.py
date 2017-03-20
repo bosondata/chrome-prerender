@@ -107,6 +107,7 @@ class Tab:
     async def navigate(self, url):
         if url != 'about:blank':
             self.iteration += 1
+            logger.info('Tab %s [%d] navigating to %s', self.id, self.iteration, url)
         await self.send({
             'method': 'Page.navigate',
             'params': {'url': url}
