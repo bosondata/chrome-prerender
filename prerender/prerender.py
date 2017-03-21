@@ -29,15 +29,7 @@ class Prerender:
         await self._ctrl_tab.attach()
         logger.info('Connected to control tab %s', self._ctrl_tab.id)
         for i in range(CONCURRENCY_PER_WORKER):
-            await self._ctrl_tab.send({
-                'method': 'Target.createTarget',
-                'params': {
-                    'url': 'about:blank'
-                }
-            })
-            await self._ctrl_tab.recv()
-
-        for tab in await self._rdp.debuggable_tabs():
+            tab = await self._rdp.new_tab()
             await self._idle_tabs.put(tab)
 
     async def tabs(self):
@@ -94,14 +86,7 @@ class Prerender:
             return
 
         await self.close_tab(tab.id)
-        await self._ctrl_tab.send({
-            'method': 'Target.createTarget',
-            'params': {
-                'url': 'about:blank'
-            }
-        })
-        await self._ctrl_tab.recv()
+        tab = await self._rdp.new_tab()
         await asyncio.sleep(0.5)
-        for tab in await self._rdp.debuggable_tabs():
-            await self._idle_tabs.put(tab)
-            logger.info('New tab %s added', tab.id)
+        await self._idle_tabs.put(tab)
+        logger.info('New tab %s added', tab.id)
