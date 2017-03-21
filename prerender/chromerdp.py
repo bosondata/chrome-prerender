@@ -74,7 +74,11 @@ class Tab:
 
     async def attach(self):
         logger.debug('Connecting to %s', self.websocket_debugger_url)
-        self.websocket = await websockets.connect(self.websocket_debugger_url, loop=self.loop)
+        self.websocket = await websockets.connect(
+            self.websocket_debugger_url,
+            max_size=5 * 2 ** 20,  # 5M
+            loop=self.loop,
+        )
 
     async def dettach(self):
         await self.websocket.close()
