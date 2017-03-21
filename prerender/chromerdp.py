@@ -38,6 +38,10 @@ class ChromeRemoteDebugger:
         async with self._session.get('{}/json/close/{}'.format(self._debugger_url, tab_id)) as res:
             return await res.text()
 
+    async def version(self):
+        async with self._session.get('{}/json/version'.format(self._debugger_url)) as res:
+            return await res.json(loads=json.loads)
+
     def __del__(self):
         self._session.close()
 

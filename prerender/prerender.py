@@ -35,6 +35,9 @@ class Prerender:
     async def tabs(self):
         return await self._rdp.tabs()
 
+    async def version(self):
+        return await self._rdp.version()
+
     async def new_tab(self, url=None):
         await self._ctrl_tab.send({
             'method': 'Target.createTarget',

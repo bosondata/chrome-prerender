@@ -82,6 +82,13 @@ async def list_browser_tabs(request):
     return response.json(tabs, ensure_ascii=False, indent=2, escape_forward_slashes=False)
 
 
+@app.route('/browser/version')
+async def show_brower_version(request):
+    renderer = request.app.prerender
+    version = await renderer.version()
+    return response.json(version, ensure_ascii=False, indent=2, escape_forward_slashes=False)
+
+
 @app.exception(NotFound)
 async def handle_request(request, exception):
     # compatible with Sanic 0.4.1+
