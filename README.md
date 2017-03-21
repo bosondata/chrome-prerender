@@ -45,3 +45,7 @@ $ gunicorn --bind 0.0.0.0:3000 --worker-class sanic_gunicorn.Worker prerender.ap
 ## Configure client
 
 Please view the original NodeJs version [prerender](https://github.com/prerender/prerender#official-middleware) README.
+
+## License
+
+MIT
