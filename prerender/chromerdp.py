@@ -73,7 +73,7 @@ class Tab:
         return self._request_id
 
     async def attach(self):
-        logger.info('Connecting to %s', self.websocket_debugger_url)
+        logger.debug('Connecting to %s', self.websocket_debugger_url)
         self.websocket = await websockets.connect(self.websocket_debugger_url, loop=self.loop)
 
     async def dettach(self):
