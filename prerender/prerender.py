@@ -20,17 +20,14 @@ class Prerender:
         self.port = port
         self.loop = loop
         self._rdp = ChromeRemoteDebugger(host, port, loop=loop)
-        self._ctrl_tab = None
         self._idle_tabs = asyncio.Queue(loop=self.loop)
+        self._tab_ids = []
 
     async def connect(self):
-        tabs = await self._rdp.debuggable_tabs()
-        self._ctrl_tab = tabs[0]
-        await self._ctrl_tab.attach()
-        logger.info('Connected to control tab %s', self._ctrl_tab.id)
         for i in range(CONCURRENCY_PER_WORKER):
             tab = await self._rdp.new_tab()
             await self._idle_tabs.put(tab)
+            self._tab_ids.append(tab.id)
 
     async def tabs(self):
         return await self._rdp.tabs()
@@ -38,34 +35,9 @@ class Prerender:
     async def version(self):
         return await self._rdp.version()
 
-    async def new_tab(self, url=None):
-        await self._ctrl_tab.send({
-            'method': 'Target.createTarget',
-            'params': {
-                'url': url or 'about:blank'
-            }
-        })
-        res = await self._ctrl_tab.recv()
-        tab_id = res['result']['targetId']
-        logger.info('Created new tab %s', tab_id)
-        tabs = await self._rdp.debuggable_tabs()
-        tab = [tb for tb in tabs if tb.id == tab_id][0]
-        return tab
-
-    async def close_tab(self, tab_id):
-        await self._ctrl_tab.send({
-            'method': 'Target.closeTarget',
-            'params': {'targetId': tab_id}
-        })
-        res = await self._ctrl_tab.recv()
-        logger.info('Closed tab %s', tab_id)
-        return res
-
     async def shutdown(self):
-        tabs = await self._rdp.debuggable_tabs()
-        for tab in tabs:
-            await self.close_tab(tab.id)
-        await self._ctrl_tab.dettach()
+        for tab_id in self._tab_ids:
+            await self._rdp.close_tab(tab_id)
 
     async def render(self, url):
         tab = await self._idle_tabs.get()
@@ -88,8 +60,10 @@ class Prerender:
             await self._idle_tabs.put(tab)
             return
 
-        await self.close_tab(tab.id)
+        await tab.close()
+        self._tab_ids.remove(tab.id)
         tab = await self._rdp.new_tab()
         await asyncio.sleep(0.5)
         await self._idle_tabs.put(tab)
+        self._tab_ids.append(tab.id)
         logger.info('New tab %s added', tab.id)
