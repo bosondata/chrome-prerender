@@ -32,11 +32,13 @@ class ChromeRemoteDebugger:
             endpoint = '{}?{}'.format(endpoint, url)
         async with self._session.get(endpoint) as res:
             tab = await res.json(loads=json.loads)
+            logger.info('Created new tab %s', tab['id'])
             return Tab(self, tab)
 
     async def close_tab(self, tab_id):
         async with self._session.get('{}/json/close/{}'.format(self._debugger_url, tab_id)) as res:
-            return await res.text()
+            await res.text()
+            logger.info('Closed tab %s', tab_id)
 
     async def version(self):
         async with self._session.get('{}/json/version'.format(self._debugger_url)) as res:

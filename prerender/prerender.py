@@ -21,13 +21,11 @@ class Prerender:
         self.loop = loop
         self._rdp = ChromeRemoteDebugger(host, port, loop=loop)
         self._idle_tabs = asyncio.Queue(loop=self.loop)
-        self._tab_ids = []
 
     async def connect(self):
         for i in range(CONCURRENCY_PER_WORKER):
             tab = await self._rdp.new_tab()
             await self._idle_tabs.put(tab)
-            self._tab_ids.append(tab.id)
 
     async def tabs(self):
         return await self._rdp.tabs()
@@ -36,8 +34,12 @@ class Prerender:
         return await self._rdp.version()
 
     async def shutdown(self):
-        for tab_id in self._tab_ids:
-            await self._rdp.close_tab(tab_id)
+        try:
+            while True:
+                tab = self._idle_tabs.get_nowait()
+                await tab.close()
+        except asyncio.QueueEmpty:
+            pass
 
     async def render(self, url):
         tab = await self._idle_tabs.get()
@@ -61,9 +63,6 @@ class Prerender:
             return
 
         await tab.close()
-        self._tab_ids.remove(tab.id)
         tab = await self._rdp.new_tab()
         await asyncio.sleep(0.5)
         await self._idle_tabs.put(tab)
-        self._tab_ids.append(tab.id)
-        logger.info('New tab %s added', tab.id)
