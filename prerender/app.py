@@ -168,7 +168,7 @@ async def before_server_start(app, loop):
 
     app.prerender = Prerender(loop=loop)
     if CONCURRENCY_PER_WORKER > 0:
-        await app.prerender.connect()
+        await app.prerender.bootstrap()
 
 
 @app.listener('after_server_stop')

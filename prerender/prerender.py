@@ -22,7 +22,7 @@ class Prerender:
         self._rdp = ChromeRemoteDebugger(host, port, loop=loop)
         self._idle_tabs = asyncio.Queue(loop=self.loop)
 
-    async def connect(self):
+    async def bootstrap(self):
         for i in range(CONCURRENCY_PER_WORKER):
             tab = await self._rdp.new_tab()
             await self._idle_tabs.put(tab)
@@ -54,10 +54,10 @@ class Prerender:
             if tab.websocket:
                 await tab.dettach()
             self._idle_tabs.task_done()
-            await self.manage_tab(tab)
+            await self._manage_tab(tab)
         return html
 
-    async def manage_tab(self, tab):
+    async def _manage_tab(self, tab):
         if tab.iteration < MAX_ITERATIONS:
             await self._idle_tabs.put(tab)
             return
