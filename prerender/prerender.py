@@ -52,7 +52,7 @@ class Prerender:
             await tab.navigate('about:blank')
         finally:
             if tab.websocket:
-                await tab.dettach()
+                await tab.detach()
             self._idle_tabs.task_done()
             await self._manage_tab(tab)
         return html

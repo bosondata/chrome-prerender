@@ -82,7 +82,7 @@ class Tab:
             loop=self.loop,
         )
 
-    async def dettach(self):
+    async def detach(self):
         await self.websocket.close()
         self._reset()
 
