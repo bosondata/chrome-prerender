@@ -82,7 +82,8 @@ class SentryErrorHandler(ErrorHandler):
     def default(self, request, exception):
         if exception is None:
             return text('unknown error occurred', status=500)
-        sentry.captureException()
+        if sentry:
+            sentry.captureException()
         return super().default(request, exception)
 
 
