@@ -4,6 +4,7 @@ import logging
 from multiprocessing import cpu_count
 
 from async_timeout import timeout
+from websockets.exceptions import InvalidHandshake
 
 from .chromerdp import ChromeRemoteDebugger
 
@@ -50,12 +51,16 @@ class Prerender:
             with timeout(PRERENDER_TIMEOUT):
                 html = await tab.wait()
             await tab.navigate('about:blank')
+            return html
+        except InvalidHandshake:
+            logger.error('Chrome invalid handshake for tab %s', tab.id)
+            tab.iteration = MAX_ITERATIONS  # set to MAX_ITERATIONS to close it in `_manage_tab`
+            raise
         finally:
             if tab.websocket:
                 await tab.detach()
             self._idle_tabs.task_done()
             await self._manage_tab(tab)
-        return html
 
     async def _manage_tab(self, tab):
         if tab.iteration < MAX_ITERATIONS:
