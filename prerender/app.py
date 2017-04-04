@@ -14,7 +14,6 @@ import aiofiles.os
 from sanic import Sanic
 from sanic import response
 from sanic.exceptions import NotFound
-from sanic.handlers import ErrorHandler
 from raven import Client
 from raven_aiohttp import AioHttpTransport
 
@@ -73,21 +72,7 @@ async def _is_cache_valid(path):
     return False
 
 
-class SentryErrorHandler(ErrorHandler):
-    def response(self, request, exception):
-        if request is None or exception is None:
-            return text('unknown error occurred', status=500)
-        return super().response(request, exception)
-
-    def default(self, request, exception):
-        if exception is None:
-            return text('unknown error occurred', status=500)
-        if sentry:
-            sentry.captureException()
-        return super().default(request, exception)
-
-
-app = Sanic(__name__, error_handler=SentryErrorHandler())
+app = Sanic(__name__)
 
 
 @app.route('/browser/list')
