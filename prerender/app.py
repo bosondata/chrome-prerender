@@ -75,7 +75,7 @@ async def _is_cache_valid(path):
 
 class SentryErrorHandler(ErrorHandler):
     def response(self, request, exception):
-        if request is None:
+        if request is None or exception is None:
             return text('unknown error occurred', status=500)
         return super().response(request, exception)
 
