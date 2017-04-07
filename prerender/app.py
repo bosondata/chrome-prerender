@@ -89,6 +89,22 @@ async def show_brower_version(request):
     return response.json(version, ensure_ascii=False, indent=2, escape_forward_slashes=False)
 
 
+@app.route('/browser/disable', methods=['PUT'])
+async def disable_browser_rendering(request):
+    global CONCURRENCY_PER_WORKER
+
+    CONCURRENCY_PER_WORKER = 0
+    return response.json({'message': 'success'})
+
+
+@app.route('/browser/enable', methods=['PUT'])
+async def enable_browser_rendering(request):
+    global CONCURRENCY_PER_WORKER
+
+    CONCURRENCY_PER_WORKER = int(os.environ['CONCURRENCY'])
+    return response.json({'message': 'success'})
+
+
 @app.exception(NotFound)
 async def handle_request(request, exception):
     # compatible with Sanic 0.4.1+
