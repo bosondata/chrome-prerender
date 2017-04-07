@@ -1,4 +1,6 @@
 import os
+import signal
+import faulthandler
 
 from .app import app
 
@@ -9,6 +11,7 @@ PORT = int(os.environ.get('PORT', 8000))
 
 
 def main():
+    faulthandler.register(signal.SIGUSR1)
     app.run(host=HOST, port=PORT, debug=DEBUG)
 
 
