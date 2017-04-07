@@ -56,6 +56,11 @@ class Prerender:
             logger.error('Chrome invalid handshake for tab %s', tab.id)
             tab.iteration = MAX_ITERATIONS  # set to MAX_ITERATIONS to close it in `_manage_tab`
             raise
+        except RuntimeError as e:
+            # https://github.com/MagicStack/uvloop/issues/68
+            if 'unable to perform operation' in str(e):
+                tab.iteration = MAX_ITERATIONS  # set to MAX_ITERATIONS to close it in `_manage_tab`
+            raise
         finally:
             if tab.websocket:
                 await tab.detach()
