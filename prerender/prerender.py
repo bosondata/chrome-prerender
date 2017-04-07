@@ -44,35 +44,41 @@ class Prerender:
 
     async def render(self, url):
         tab = await self._idle_tabs.get()
+        reopen = False
         try:
             await tab.attach()
             await tab.listen()
             await tab.navigate(url)
             with timeout(PRERENDER_TIMEOUT):
                 html = await tab.wait()
-            await tab.navigate('about:blank')
             return html
         except InvalidHandshake:
             logger.error('Chrome invalid handshake for tab %s', tab.id)
-            tab.iteration = MAX_ITERATIONS  # set to MAX_ITERATIONS to close it in `_manage_tab`
+            reopen = True
             raise
         except RuntimeError as e:
             # https://github.com/MagicStack/uvloop/issues/68
             if 'unable to perform operation' in str(e):
-                tab.iteration = MAX_ITERATIONS  # set to MAX_ITERATIONS to close it in `_manage_tab`
+                reopen = True
             raise
         finally:
             if tab.websocket:
-                await tab.detach()
+                try:
+                    await tab.navigate('about:blank')
+                    await tab.detach()
+                except Exception:
+                    logger.exception('Error detaching from tab %s', tab.id)
+                    reopen = True
             self._idle_tabs.task_done()
-            await self._manage_tab(tab)
+            await self._manage_tab(tab, reopen)
 
-    async def _manage_tab(self, tab):
-        if tab.iteration < MAX_ITERATIONS:
+    async def _manage_tab(self, tab, reopen=False):
+        if not reopen and tab.iteration < MAX_ITERATIONS:
             await self._idle_tabs.put(tab)
             return
 
         await tab.close()
         tab = await self._rdp.new_tab()
+        # wait until Chrome is ready
         await asyncio.sleep(0.5)
         await self._idle_tabs.put(tab)
