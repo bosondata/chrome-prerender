@@ -16,29 +16,29 @@ class ChromeRemoteDebugger:
         self._session = aiohttp.ClientSession(loop=loop)
         self.loop = loop
 
-    async def tabs(self):
+    async def pages(self):
         async with self._session.get('{}/json/list'.format(self._debugger_url)) as res:
-            tabs = await res.json(loads=json.loads)
-            return tabs
+            pages = await res.json(loads=json.loads)
+            return pages
 
-    async def debuggable_tabs(self):
-        tabs = await self.tabs()
-        return [Tab(self, tab, loop=self.loop) for tab in tabs
-                if 'webSocketDebuggerUrl' in tab and tab['type'] == 'page']
+    async def debuggable_pages(self):
+        pages = await self.pages()
+        return [Page(self, page, loop=self.loop) for page in pages
+                if 'webSocketDebuggerUrl' in page and page['type'] == 'page']
 
-    async def new_tab(self, url=None):
+    async def new_page(self, url=None):
         endpoint = '{}/json/new'.format(self._debugger_url)
         if url:
             endpoint = '{}?{}'.format(endpoint, url)
         async with self._session.get(endpoint) as res:
-            tab = await res.json(loads=json.loads)
-            logger.info('Created new tab %s', tab['id'])
-            return Tab(self, tab)
+            page = await res.json(loads=json.loads)
+            logger.info('Created new page %s', page['id'])
+            return Page(self, page)
 
-    async def close_tab(self, tab_id):
-        async with self._session.get('{}/json/close/{}'.format(self._debugger_url, tab_id)) as res:
+    async def close_page(self, page_id):
+        async with self._session.get('{}/json/close/{}'.format(self._debugger_url, page_id)) as res:
             info = await res.text()
-            logger.info('Closing tab %s: %s', tab_id, info)
+            logger.info('Closing page %s: %s', page_id, info)
 
     async def version(self):
         async with self._session.get('{}/json/version'.format(self._debugger_url)) as res:
@@ -51,12 +51,12 @@ class ChromeRemoteDebugger:
         return '<ChromeRemoteDebugger@{}>'.format(self._debugger_url)
 
 
-class Tab:
-    def __init__(self, debugger, tab_info, loop=None):
+class Page:
+    def __init__(self, debugger, page_info, loop=None):
         self._debugger = debugger
         self.loop = loop
-        self.id = tab_info['id']
-        self.websocket_debugger_url = tab_info['webSocketDebuggerUrl']
+        self.id = page_info['id']
+        self.websocket_debugger_url = page_info['webSocketDebuggerUrl']
         self.iteration = 0
         self._reset()
 
@@ -117,7 +117,7 @@ class Tab:
     async def navigate(self, url):
         if url != 'about:blank':
             self.iteration += 1
-            logger.info('Tab %s [%d] navigating to %s', self.id, self.iteration, url)
+            logger.info('Page %s [%d] navigating to %s', self.id, self.iteration, url)
         await self.send({
             'method': 'Page.navigate',
             'params': {'url': url}
@@ -176,7 +176,7 @@ class Tab:
         })
 
     async def close(self):
-        return await self._debugger.close_tab(self.id)
+        return await self._debugger.close_page(self.id)
 
     def __repr__(self):
-        return '<Tab #{}>'.format(self.id)
+        return '<Page #{}>'.format(self.id)

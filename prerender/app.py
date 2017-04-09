@@ -76,10 +76,10 @@ app = Sanic(__name__)
 
 
 @app.route('/browser/list')
-async def list_browser_tabs(request):
+async def list_browser_pages(request):
     renderer = request.app.prerender
-    tabs = await renderer.tabs()
-    return response.json(tabs, ensure_ascii=False, indent=2, escape_forward_slashes=False)
+    pages = await renderer.pages()
+    return response.json(pages, ensure_ascii=False, indent=2, escape_forward_slashes=False)
 
 
 @app.route('/browser/version')

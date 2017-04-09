@@ -21,44 +21,44 @@ class Prerender:
         self.port = port
         self.loop = loop
         self._rdp = ChromeRemoteDebugger(host, port, loop=loop)
-        self._tab_ids = set()
-        self._idle_tabs = asyncio.Queue(loop=self.loop)
+        self._page_ids = set()
+        self._idle_pages = asyncio.Queue(loop=self.loop)
 
     async def bootstrap(self):
         for i in range(CONCURRENCY_PER_WORKER):
-            tab = await self._rdp.new_tab()
-            await self._idle_tabs.put(tab)
-            self._tab_ids.add(tab.id)
+            page = await self._rdp.new_page()
+            await self._idle_pages.put(page)
+            self._page_ids.add(page.id)
 
-    async def tabs(self):
-        return await self._rdp.tabs()
+    async def pages(self):
+        return await self._rdp.pages()
 
     async def version(self):
         return await self._rdp.version()
 
     async def shutdown(self):
-        for tab_id in self._tab_ids:
-            await self._rdp.close_tab(tab_id)
+        for page_id in self._page_ids:
+            await self._rdp.close_page(page_id)
 
     async def render(self, url):
-        if not self._tab_ids:
+        if not self._page_ids:
             raise RuntimeError('No browser available')
 
-        tab = await self._idle_tabs.get()
+        page = await self._idle_pages.get()
         reopen = False
         try:
-            await tab.attach()
-            await tab.listen()
-            await tab.navigate(url)
+            await page.attach()
+            await page.listen()
+            await page.navigate(url)
             with timeout(PRERENDER_TIMEOUT):
-                html = await tab.wait()
+                html = await page.wait()
             return html
         except InvalidHandshake:
-            logger.error('Chrome invalid handshake for tab %s', tab.id)
+            logger.error('Chrome invalid handshake for page %s', page.id)
             reopen = True
             raise
         except ConnectionClosed:
-            logger.error('Chrome remote connection closed for tab %s', tab.id)
+            logger.error('Chrome remote connection closed for page %s', page.id)
             reopen = True
             raise
         except RuntimeError as e:
@@ -67,25 +67,25 @@ class Prerender:
                 reopen = True
             raise
         finally:
-            if tab.websocket:
+            if page.websocket:
                 try:
-                    await tab.navigate('about:blank')
-                    await tab.detach()
+                    await page.navigate('about:blank')
+                    await page.detach()
                 except Exception:
-                    logger.exception('Error detaching from tab %s', tab.id)
+                    logger.exception('Error detaching from page %s', page.id)
                     reopen = True
-            self._idle_tabs.task_done()
-            await self._manage_tab(tab, reopen)
+            self._idle_pages.task_done()
+            await self._manage_page(page, reopen)
 
-    async def _manage_tab(self, tab, reopen=False):
-        if not reopen and tab.iteration < MAX_ITERATIONS:
-            await self._idle_tabs.put(tab)
+    async def _manage_page(self, page, reopen=False):
+        if not reopen and page.iteration < MAX_ITERATIONS:
+            await self._idle_pages.put(page)
             return
 
-        await tab.close()
-        self._tab_ids.remove(tab.id)
-        tab = await self._rdp.new_tab()
+        await page.close()
+        self._page_ids.remove(page.id)
+        page = await self._rdp.new_page()
         # wait until Chrome is ready
         await asyncio.sleep(0.5)
-        await self._idle_tabs.put(tab)
-        self._tab_ids.add(tab.id)
+        await self._idle_pages.put(page)
+        self._page_ids.add(page.id)
