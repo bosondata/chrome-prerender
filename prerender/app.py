@@ -113,6 +113,7 @@ async def _render(prerender, url):
             return await prerender.render(url)
         except TemporaryBrowserFailure:
             if i < 1:
+                logger.warning('Temporary browser failure, retry rendering %s', url)
                 continue
             raise
 
