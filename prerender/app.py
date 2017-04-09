@@ -17,7 +17,7 @@ from sanic.exceptions import NotFound
 from raven import Client
 from raven_aiohttp import AioHttpTransport
 
-from .prerender import Prerender, CONCURRENCY_PER_WORKER
+from .prerender import Prerender, CONCURRENCY_PER_WORKER, TemporaryBrowserFailure
 
 
 logger = logging.getLogger(__name__)
@@ -105,6 +105,17 @@ async def enable_browser_rendering(request):
     return response.json({'message': 'success'})
 
 
+async def _render(prerender, url):
+    '''Retry once after TemporaryBrowserFailure occurred.'''
+    for i in range(2):
+        try:
+            return await prerender.render(url)
+        except TemporaryBrowserFailure:
+            if i < 1:
+                continue
+            raise
+
+
 @app.exception(NotFound)
 async def handle_request(request, exception):
     # compatible with Sanic 0.4.1+
@@ -138,7 +149,7 @@ async def handle_request(request, exception):
 
     start_time = time.time()
     try:
-        html = await request.app.prerender.render(url)
+        html = await _render(request.app.prerender, url)
         duration_ms = int((time.time() - start_time) * 1000)
         logger.info('Got 200 for %s in %dms', url, duration_ms)
         executor.submit(_save_to_cache, cache_path, html)

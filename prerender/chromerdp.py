@@ -10,6 +10,10 @@ import websockets
 logger = logging.getLogger(__name__)
 
 
+class TemporaryBrowserFailure(Exception):
+    pass
+
+
 class ChromeRemoteDebugger:
     def __init__(self, host, port, loop=None):
         self._debugger_url = 'http://{}:{}'.format(host, port)
@@ -143,10 +147,10 @@ class Page:
             method = obj.get('method')
             if method == 'Inspector.detached':
                 # Chrome page destroyed
-                raise RuntimeError('Inspector detached: {}'.format(obj['params']['reason']))
+                raise TemporaryBrowserFailure('Inspector detached: {}'.format(obj['params']['reason']))
             if method == 'Inspector.targetCrashed':
                 # Chrome page crashed
-                raise RuntimeError('Inspector target crashed')
+                raise TemporaryBrowserFailure('Inspector target crashed')
 
             if method == 'Page.loadEventFired':
                 self._load_event_fired = True

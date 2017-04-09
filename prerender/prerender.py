@@ -5,7 +5,7 @@ from multiprocessing import cpu_count
 
 from websockets.exceptions import InvalidHandshake, ConnectionClosed
 
-from .chromerdp import ChromeRemoteDebugger
+from .chromerdp import ChromeRemoteDebugger, TemporaryBrowserFailure
 
 logger = logging.getLogger(__name__)
 
@@ -52,25 +52,25 @@ class Prerender:
             except asyncio.TimeoutError:
                 logger.error('Attach to Chrome page %s timed out in 1s, page is likely closed', page.id)
                 reopen = True
-                raise
+                raise TemporaryBrowserFailure('Attach to Chrome page timed out')
             await page.navigate(url)
             html = await asyncio.wait_for(page.wait(), timeout=PRERENDER_TIMEOUT)
             return html
         except InvalidHandshake:
             logger.error('Chrome invalid handshake for page %s', page.id)
             reopen = True
-            raise
+            raise TemporaryBrowserFailure('Invalid handshake')
         except ConnectionClosed:
             logger.error('Chrome remote connection closed for page %s', page.id)
             reopen = True
-            raise
+            raise TemporaryBrowserFailure('Chrome remote debugging connection closed')
         except RuntimeError as e:
-            # RuntimeError reasons:
-            # 1. https://github.com/MagicStack/uvloop/issues/68
-            # 2. Chrome inspector detached
-            # 3. Chrome inspector target crashed
-            reopen = True
-            raise
+            # https://github.com/MagicStack/uvloop/issues/68
+            if 'unable to perform operation' in str(e):
+                reopen = True
+                raise TemporaryBrowserFailure(str(e))
+            else:
+                raise
         finally:
             if page.websocket:
                 try:
