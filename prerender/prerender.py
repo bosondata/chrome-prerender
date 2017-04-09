@@ -3,7 +3,6 @@ import asyncio
 import logging
 from multiprocessing import cpu_count
 
-from async_timeout import timeout
 from websockets.exceptions import InvalidHandshake, ConnectionClosed
 
 from .chromerdp import ChromeRemoteDebugger
@@ -55,8 +54,7 @@ class Prerender:
                 reopen = True
                 raise
             await page.navigate(url)
-            with timeout(PRERENDER_TIMEOUT):
-                html = await page.wait()
+            html = await asyncio.wait_for(page.wait(), timeout=PRERENDER_TIMEOUT)
             return html
         except InvalidHandshake:
             logger.error('Chrome invalid handshake for page %s', page.id)
