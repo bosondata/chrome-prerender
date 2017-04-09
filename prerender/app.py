@@ -198,7 +198,12 @@ async def before_server_start(app, loop):
 
     app.prerender = Prerender(loop=loop)
     if CONCURRENCY_PER_WORKER > 0:
-        await app.prerender.bootstrap()
+        try:
+            await app.prerender.bootstrap()
+        except Exception:
+            logger.error('Error bootstrapping Prerender, please start Chrome first.')
+            await app.prerender.shutdown()
+            raise
 
 
 @app.listener('after_server_stop')
