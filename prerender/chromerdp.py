@@ -37,8 +37,8 @@ class ChromeRemoteDebugger:
 
     async def close_tab(self, tab_id):
         async with self._session.get('{}/json/close/{}'.format(self._debugger_url, tab_id)) as res:
-            await res.text()
-            logger.info('Closed tab %s', tab_id)
+            info = await res.text()
+            logger.info('Closing tab %s: %s', tab_id, info)
 
     async def version(self):
         async with self._session.get('{}/json/version'.format(self._debugger_url)) as res:
@@ -145,7 +145,6 @@ class Tab:
                 self._load_event_fired = True
             if not self._prerender_ready and self._load_event_fired:
                 await self.evaluate('window.prerenderReady == true')
-                await asyncio.sleep(0.5)
             req_id = obj.get('id')
             if req_id is None:
                 continue
