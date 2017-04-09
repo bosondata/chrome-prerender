@@ -141,6 +141,13 @@ class Page:
         while True:
             obj = await self.recv()
             method = obj.get('method')
+            if method == 'Inspector.detached':
+                # Chrome page destroyed
+                raise RuntimeError('Inspector detached: {}'.format(obj['params']['reason']))
+            if method == 'Inspector.targetCrashed':
+                # Chrome page crashed
+                raise RuntimeError('Inspector target crashed')
+
             if method == 'Page.loadEventFired':
                 self._load_event_fired = True
             if not self._prerender_ready and self._load_event_fired:

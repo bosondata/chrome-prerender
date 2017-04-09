@@ -65,9 +65,11 @@ class Prerender:
             reopen = True
             raise
         except RuntimeError as e:
-            # https://github.com/MagicStack/uvloop/issues/68
-            if 'unable to perform operation' in str(e):
-                reopen = True
+            # RuntimeError reasons:
+            # 1. https://github.com/MagicStack/uvloop/issues/68
+            # 2. Chrome inspector detached
+            # 3. Chrome inspector target crashed
+            reopen = True
             raise
         finally:
             if page.websocket:
