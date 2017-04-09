@@ -48,7 +48,13 @@ class Prerender:
         reopen = False
         try:
             await page.attach()
-            await page.listen()
+            try:
+                await asyncio.wait_for(page.listen(), timeout=1)
+            except asyncio.TimeoutError:
+                # Page maybe closed
+                logger.error('Attatch to Chrome page %s timed out', page.id)
+                reopen = True
+                raise
             await page.navigate(url)
             with timeout(PRERENDER_TIMEOUT):
                 html = await page.wait()
@@ -69,7 +75,8 @@ class Prerender:
         finally:
             if page.websocket:
                 try:
-                    await page.navigate('about:blank')
+                    if not reopen:
+                        await page.navigate('about:blank')
                     await page.detach()
                 except Exception:
                     logger.exception('Error detaching from page %s', page.id)
