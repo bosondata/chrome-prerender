@@ -193,7 +193,7 @@ async def before_server_start(app, loop):
         },
     }
     logging.config.dictConfig(logging_config)
-    if app.debug:
+    if app.debug or loop.get_debug():
         warnings.simplefilter('always', ResourceWarning)
 
     app.prerender = Prerender(loop=loop)
