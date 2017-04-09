@@ -180,3 +180,6 @@ class Page:
 
     def __repr__(self):
         return '<Page #{}>'.format(self.id)
+
+    def __hash__(self):
+        return hash(repr(self))

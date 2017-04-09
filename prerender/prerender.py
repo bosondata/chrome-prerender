@@ -21,14 +21,14 @@ class Prerender:
         self.port = port
         self.loop = loop
         self._rdp = ChromeRemoteDebugger(host, port, loop=loop)
-        self._page_ids = set()
+        self._pages = set()
         self._idle_pages = asyncio.Queue(loop=self.loop)
 
     async def bootstrap(self):
         for i in range(CONCURRENCY_PER_WORKER):
             page = await self._rdp.new_page()
             await self._idle_pages.put(page)
-            self._page_ids.add(page.id)
+            self._pages.add(page)
 
     async def pages(self):
         return await self._rdp.pages()
@@ -37,11 +37,11 @@ class Prerender:
         return await self._rdp.version()
 
     async def shutdown(self):
-        for page_id in self._page_ids:
-            await self._rdp.close_page(page_id)
+        for page in self._pages:
+            await page.close()
 
     async def render(self, url):
-        if not self._page_ids:
+        if not self._pages:
             raise RuntimeError('No browser available')
 
         page = await self._idle_pages.get()
@@ -83,9 +83,9 @@ class Prerender:
             return
 
         await page.close()
-        self._page_ids.remove(page.id)
+        self._pages.remove(page)
         page = await self._rdp.new_page()
         # wait until Chrome is ready
         await asyncio.sleep(0.5)
         await self._idle_pages.put(page)
-        self._page_ids.add(page.id)
+        self._pages.add(page)
