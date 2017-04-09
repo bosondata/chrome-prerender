@@ -38,6 +38,7 @@ class Prerender:
     async def shutdown(self):
         for page in self._pages:
             await page.close()
+        self._rdp.shutdown()
 
     async def render(self, url):
         if not self._pages:

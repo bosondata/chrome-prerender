@@ -48,7 +48,7 @@ class ChromeRemoteDebugger:
         async with self._session.get('{}/json/version'.format(self._debugger_url)) as res:
             return await res.json(loads=json.loads)
 
-    def __del__(self):
+    def shutdown(self):
         self._session.close()
 
     def __repr__(self):
