@@ -5,6 +5,7 @@ import lzma
 import logging
 import logging.config
 import asyncio
+import warnings
 from urllib.parse import urlparse
 from concurrent.futures import ThreadPoolExecutor
 from multiprocessing import cpu_count
@@ -192,6 +193,8 @@ async def before_server_start(app, loop):
         },
     }
     logging.config.dictConfig(logging_config)
+    if app.debug:
+        warnings.simplefilter('always', ResourceWarning)
 
     app.prerender = Prerender(loop=loop)
     if CONCURRENCY_PER_WORKER > 0:
