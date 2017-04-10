@@ -98,7 +98,7 @@ class Page:
         await self.recv()
         await self.send({
             'id': self.next_request_id,
-            'method': 'Network.enable'
+            'method': 'Log.enable'
         })
         await self.recv()
 
@@ -138,10 +138,6 @@ class Page:
         })
 
     async def wait(self):
-        await self.send({
-            'id': self.next_request_id,
-            'method': 'Network.disable'
-        })
         while True:
             obj = await self.recv()
             method = obj.get('method')
@@ -152,10 +148,28 @@ class Page:
                 # Chrome page crashed
                 raise TemporaryBrowserFailure('Inspector target crashed')
 
+            if method == 'Log.entryAdded':
+                # Log browser console logs for debugging
+                entry = obj['params']['entry']
+                log_func = getattr(logger, entry['level'], None)
+                if log_func:
+                    resource_info = entry.get('url', '')
+                    if entry.get('lineNumber'):
+                        resource_info = '{}:{}'.format(resource_info, entry['lineNumber'])
+                    log_func('%s console %s log %s: %s',
+                             resource_info,
+                             entry['source'],
+                             entry['level'],
+                             entry['text'])
+                continue
+
             if method == 'Page.loadEventFired':
                 self._load_event_fired = True
+                continue
+
             if not self._prerender_ready and self._load_event_fired:
                 await self.evaluate('window.prerenderReady == true')
+
             req_id = obj.get('id')
             if req_id is None:
                 continue
