@@ -73,18 +73,15 @@ class Prerender:
             else:
                 raise
         finally:
-            if page.websocket:
-                try:
-                    if not reopen:
-                        await page.navigate('about:blank')
-                    await page.detach()
-                except Exception:
-                    logger.exception('Error detaching from page %s', page.id)
-                    reopen = True
-            self._idle_pages.task_done()
-            await self._manage_page(page, reopen)
+            await asyncio.shield(self._manage_page(page, reopen))
 
     async def _manage_page(self, page, reopen=False):
+        self._idle_pages.task_done()
+        if page.websocket:
+            if not reopen:
+                await page.navigate('about:blank')  # Saves memory
+            await page.detach()
+
         if not reopen and page.iteration < MAX_ITERATIONS:
             await self._idle_pages.put(page)
             return
@@ -93,6 +90,7 @@ class Prerender:
         self._pages.remove(page)
         page = await self._rdp.new_page()
         # wait until Chrome is ready
-        await asyncio.sleep(0.5)
+        await asyncio.sleep(0.1)
         await self._idle_pages.put(page)
         self._pages.add(page)
+        logger.info('Page %s added to idle pages queue', page.id)
