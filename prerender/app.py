@@ -111,9 +111,10 @@ async def _render(prerender, url):
     for i in range(2):
         try:
             return await prerender.render(url)
-        except TemporaryBrowserFailure:
+        except TemporaryBrowserFailure as e:
             if i < 1:
-                logger.warning('Temporary browser failure, retry rendering %s', url)
+                logger.warning('Temporary browser failure: %s, retry rendering %s in 1s', str(e), url)
+                await asyncio.sleep(1)
                 continue
             raise
 

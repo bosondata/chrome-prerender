@@ -44,7 +44,11 @@ class Prerender:
         if not self._pages:
             raise RuntimeError('No browser available')
 
-        page = await self._idle_pages.get()
+        try:
+            page = await asyncio.wait_for(self._idle_pages.get(), timeout=10)
+        except asyncio.TimeoutError:
+            raise TemporaryBrowserFailure('No Chrome page available in 10s')
+
         reopen = False
         try:
             await page.attach()
