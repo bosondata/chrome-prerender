@@ -10,12 +10,12 @@ from urllib.parse import urlparse
 from concurrent.futures import ThreadPoolExecutor
 from multiprocessing import cpu_count
 
+import raven
 import aiofiles
 import aiofiles.os
 from sanic import Sanic
 from sanic import response
 from sanic.exceptions import NotFound
-from raven import Client
 from raven_aiohttp import AioHttpTransport
 
 from .prerender import Prerender, CONCURRENCY_PER_WORKER, TemporaryBrowserFailure
@@ -29,7 +29,12 @@ CACHE_ROOT_DIR = os.environ.get('CACHE_ROOT_DIR', '/tmp/prerender')
 CACHE_LIVE_TIME = int(os.environ.get('CACHE_LIVE_TIME', 3600))
 SENTRY_DSN = os.environ.get('SENTRY_DSN')
 if SENTRY_DSN:
-    sentry = Client(SENTRY_DSN, transport=AioHttpTransport)
+    sentry = raven.Client(
+        SENTRY_DSN,
+        transport=AioHttpTransport,
+        release=raven.fetch_package_version('prerender'),
+        site='Prerender',
+    )
 else:
     sentry = None
 
