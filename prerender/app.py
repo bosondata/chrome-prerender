@@ -22,7 +22,7 @@ from .prerender import Prerender, CONCURRENCY_PER_WORKER, TemporaryBrowserFailur
 
 
 logger = logging.getLogger(__name__)
-executor = ThreadPoolExecutor(max_workers=max(cpu_count(), 5))
+executor = ThreadPoolExecutor(max_workers=cpu_count() * 5)
 
 ALLOWED_DOMAINS = set(dm.strip() for dm in os.environ.get('PRERENDER_ALLOWED_DOMAINS', '').split(',') if dm.strip())
 CACHE_ROOT_DIR = os.environ.get('CACHE_ROOT_DIR', '/tmp/prerender')
@@ -210,5 +210,4 @@ async def before_server_start(app, loop):
 
 @app.listener('after_server_stop')
 async def after_server_stop(app, loop):
-    if CONCURRENCY_PER_WORKER > 0:
-        await app.prerender.shutdown()
+    await app.prerender.shutdown()
