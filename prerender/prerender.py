@@ -2,20 +2,21 @@ import os
 import asyncio
 import logging
 from multiprocessing import cpu_count
+from typing import Dict
 
 from websockets.exceptions import InvalidHandshake, ConnectionClosed
 
-from .chromerdp import ChromeRemoteDebugger, TemporaryBrowserFailure
+from .chromerdp import ChromeRemoteDebugger, Page, TemporaryBrowserFailure
 
 logger = logging.getLogger(__name__)
 
-PRERENDER_TIMEOUT = int(os.environ.get('PRERENDER_TIMEOUT', 30))
-CONCURRENCY_PER_WORKER = int(os.environ.get('CONCURRENCY', cpu_count() * 2))
-MAX_ITERATIONS = int(os.environ.get('ITERATIONS', 200))
+PRERENDER_TIMEOUT: int = int(os.environ.get('PRERENDER_TIMEOUT', 30))
+CONCURRENCY_PER_WORKER: int = int(os.environ.get('CONCURRENCY', cpu_count() * 2))
+MAX_ITERATIONS: int = int(os.environ.get('ITERATIONS', 200))
 
 
 class Prerender:
-    def __init__(self, host='localhost', port=9222, loop=None):
+    def __init__(self, host: str = 'localhost', port: int = 9222, loop=None):
         self.host = host
         self.port = port
         self.loop = loop
@@ -23,24 +24,24 @@ class Prerender:
         self._pages = set()
         self._idle_pages = asyncio.Queue(loop=self.loop)
 
-    async def bootstrap(self):
+    async def bootstrap(self) -> None:
         for i in range(CONCURRENCY_PER_WORKER):
             page = await self._rdp.new_page()
             await self._idle_pages.put(page)
             self._pages.add(page)
 
-    async def pages(self):
+    async def pages(self) -> Dict:
         return await self._rdp.pages()
 
-    async def version(self):
+    async def version(self) -> Dict:
         return await self._rdp.version()
 
-    async def shutdown(self):
+    async def shutdown(self) -> None:
         for page in self._pages:
             await page.close()
         self._rdp.shutdown()
 
-    async def render(self, url):
+    async def render(self, url: str) -> str:
         if not self._pages:
             raise RuntimeError('No browser available')
 
@@ -79,7 +80,7 @@ class Prerender:
         finally:
             await asyncio.shield(self._manage_page(page, reopen))
 
-    async def _manage_page(self, page, reopen=False):
+    async def _manage_page(self, page: Page, reopen: bool = False) -> None:
         self._idle_pages.task_done()
         if page.websocket:
             if not reopen:

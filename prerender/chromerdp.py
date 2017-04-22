@@ -1,6 +1,6 @@
-
 import logging
 import asyncio
+from typing import List, Dict
 
 import ujson as json
 import aiohttp
@@ -15,22 +15,22 @@ class TemporaryBrowserFailure(Exception):
 
 
 class ChromeRemoteDebugger:
-    def __init__(self, host, port, loop=None):
+    def __init__(self, host: str, port: int, loop=None):
         self._debugger_url = 'http://{}:{}'.format(host, port)
         self._session = aiohttp.ClientSession(loop=loop)
         self.loop = loop
 
-    async def pages(self):
+    async def pages(self) -> List[Dict]:
         async with self._session.get('{}/json/list'.format(self._debugger_url)) as res:
             pages = await res.json(loads=json.loads)
             return pages
 
-    async def debuggable_pages(self):
+    async def debuggable_pages(self) -> List['Page']:
         pages = await self.pages()
         return [Page(self, page, loop=self.loop) for page in pages
                 if 'webSocketDebuggerUrl' in page and page['type'] == 'page']
 
-    async def new_page(self, url=None):
+    async def new_page(self, url: str = None) -> 'Page':
         endpoint = '{}/json/new'.format(self._debugger_url)
         if url:
             endpoint = '{}?{}'.format(endpoint, url)
@@ -39,32 +39,32 @@ class ChromeRemoteDebugger:
             logger.info('Created new page %s', page['id'])
             return Page(self, page)
 
-    async def close_page(self, page_id):
+    async def close_page(self, page_id: str) -> None:
         async with self._session.get('{}/json/close/{}'.format(self._debugger_url, page_id)) as res:
             info = await res.text()
             logger.info('Closing page %s: %s', page_id, info)
 
-    async def version(self):
+    async def version(self) -> Dict:
         async with self._session.get('{}/json/version'.format(self._debugger_url)) as res:
             return await res.json(loads=json.loads)
 
-    def shutdown(self):
+    def shutdown(self) -> None:
         self._session.close()
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return '<ChromeRemoteDebugger@{}>'.format(self._debugger_url)
 
 
 class Page:
-    def __init__(self, debugger, page_info, loop=None):
+    def __init__(self, debugger: ChromeRemoteDebugger, page_info: Dict, loop=None):
         self._debugger = debugger
         self.loop = loop
-        self.id = page_info['id']
-        self.websocket_debugger_url = page_info['webSocketDebuggerUrl']
-        self.iteration = 0
+        self.id: str = page_info['id']
+        self.websocket_debugger_url: str = page_info['webSocketDebuggerUrl']
+        self.iteration: int = 0
         self._reset()
 
-    def _reset(self):
+    def _reset(self) -> None:
         self.websocket = None
         self._request_id = 0
         self._get_html_request_id = -1
@@ -74,11 +74,11 @@ class Page:
         self._get_document_request_id = -1
 
     @property
-    def next_request_id(self):
+    def next_request_id(self) -> int:
         self._request_id += 1
         return self._request_id
 
-    async def attach(self):
+    async def attach(self) -> None:
         logger.debug('Connecting to %s', self.websocket_debugger_url)
         self.websocket = await websockets.connect(
             self.websocket_debugger_url,
@@ -86,11 +86,11 @@ class Page:
             loop=self.loop,
         )
 
-    async def detach(self):
+    async def detach(self) -> None:
         await self.websocket.close()
         self._reset()
 
-    async def listen(self):
+    async def listen(self) -> None:
         await self.send({
             'id': self.next_request_id,
             'method': 'Page.enable'
@@ -102,23 +102,23 @@ class Page:
         })
         await self.recv()
 
-    async def send(self, payload):
+    async def send(self, payload: Dict):
         req_id = payload.get('id') or self.next_request_id
         payload['id'] = req_id
         return await self.websocket.send(json.dumps(payload))
 
-    async def recv(self):
+    async def recv(self) -> Dict:
         res = await self.websocket.recv()
         return json.loads(res)
 
-    async def set_user_agent(self, ua):
+    async def set_user_agent(self, ua: str) -> None:
         await self.send({
             'method': 'Network.setUserAgentOverride',
             'params': {'userAgent': ua}
         })
         await self.recv()
 
-    async def navigate(self, url):
+    async def navigate(self, url: str) -> None:
         if url != 'about:blank':
             self.iteration += 1
             logger.info('Page %s [%d] navigating to %s', self.id, self.iteration, url)
@@ -128,7 +128,7 @@ class Page:
         })
         await self.recv()
 
-    async def evaluate(self, expr):
+    async def evaluate(self, expr: str) -> None:
         request_id = self.next_request_id
         self._eval_request_ids.add(request_id)
         await self.send({
@@ -137,7 +137,7 @@ class Page:
             'params': {'expression': expr}
         })
 
-    async def wait(self):
+    async def wait(self) -> str:
         while True:
             obj = await self.recv()
             method = obj.get('method')
@@ -185,14 +185,14 @@ class Page:
                 html = obj['result']['outerHTML']
                 return html
 
-    async def get_document(self):
+    async def get_document(self) -> None:
         self._get_document_request_id = self.next_request_id
         await self.send({
             'id': self._get_document_request_id,
             'method': 'DOM.getDocument',
         })
 
-    async def get_html(self, node_id):
+    async def get_html(self, node_id: str) -> None:
         self._get_html_request_id = self.next_request_id
         await self.send({
             'id': self._get_html_request_id,
@@ -200,11 +200,11 @@ class Page:
             'params': {'nodeId': node_id}
         })
 
-    async def close(self):
-        return await self._debugger.close_page(self.id)
+    async def close(self) -> None:
+        await self._debugger.close_page(self.id)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return '<Page #{}>'.format(self.id)
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash(repr(self))

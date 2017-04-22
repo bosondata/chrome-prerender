@@ -9,6 +9,7 @@ import warnings
 from urllib.parse import urlparse
 from concurrent.futures import ThreadPoolExecutor
 from multiprocessing import cpu_count
+from typing import Set
 
 import raven
 import aiofiles
@@ -24,9 +25,9 @@ from .prerender import Prerender, CONCURRENCY_PER_WORKER, TemporaryBrowserFailur
 logger = logging.getLogger(__name__)
 executor = ThreadPoolExecutor(max_workers=cpu_count() * 5)
 
-ALLOWED_DOMAINS = set(dm.strip() for dm in os.environ.get('PRERENDER_ALLOWED_DOMAINS', '').split(',') if dm.strip())
-CACHE_ROOT_DIR = os.environ.get('CACHE_ROOT_DIR', '/tmp/prerender')
-CACHE_LIVE_TIME = int(os.environ.get('CACHE_LIVE_TIME', 3600))
+ALLOWED_DOMAINS: Set = set(dm.strip() for dm in os.environ.get('PRERENDER_ALLOWED_DOMAINS', '').split(',') if dm.strip())
+CACHE_ROOT_DIR: str = os.environ.get('CACHE_ROOT_DIR', '/tmp/prerender')
+CACHE_LIVE_TIME: int = int(os.environ.get('CACHE_LIVE_TIME', 3600))
 SENTRY_DSN = os.environ.get('SENTRY_DSN')
 if SENTRY_DSN:
     sentry = raven.Client(
@@ -39,7 +40,7 @@ else:
     sentry = None
 
 
-def _get_cache_file_path(parsed_url):
+def _get_cache_file_path(parsed_url: str) -> str:
     path = parsed_url.hostname
     path = os.path.join(path, os.path.normpath(parsed_url.path[1:]))
     if parsed_url.query:
@@ -47,14 +48,14 @@ def _get_cache_file_path(parsed_url):
     return os.path.join(CACHE_ROOT_DIR, path, 'prerender.cache.html')
 
 
-async def _fetch_from_cache(path):
+async def _fetch_from_cache(path: str) -> str:
     loop = asyncio.get_event_loop()
     async with aiofiles.open(path, mode='rb') as f:
         res = await loop.run_in_executor(None, lzma.decompress, await f.read())
         return res.decode('utf-8')
 
 
-def _save_to_cache(path, html):
+def _save_to_cache(path, html: str) -> None:
     save_dir = os.path.dirname(path)
     try:
         os.makedirs(save_dir, 0o755)
@@ -68,7 +69,7 @@ def _save_to_cache(path, html):
         logger.exception('Error writing cache')
 
 
-async def _is_cache_valid(path):
+async def _is_cache_valid(path: str) -> bool:
     if not os.path.exists(path):
         return False
 
@@ -111,7 +112,7 @@ async def enable_browser_rendering(request):
     return response.json({'message': 'success'})
 
 
-async def _render(prerender, url):
+async def _render(prerender: Prerender, url: str) -> str:
     '''Retry once after TemporaryBrowserFailure occurred.'''
     for i in range(2):
         try:
@@ -175,7 +176,7 @@ async def handle_request(request, exception):
 
 
 @app.listener('before_server_start')
-async def before_server_start(app, loop):
+async def before_server_start(app: Sanic, loop):
     loop.set_default_executor(executor)
 
     logging_config = {
@@ -214,5 +215,5 @@ async def before_server_start(app, loop):
 
 
 @app.listener('after_server_stop')
-async def after_server_stop(app, loop):
+async def after_server_stop(app: Sanic, loop):
     await app.prerender.shutdown()
