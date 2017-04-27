@@ -70,9 +70,6 @@ def _save_to_cache(path, html: str) -> None:
 
 
 async def _is_cache_valid(path: str) -> bool:
-    if not os.path.exists(path):
-        return False
-
     stat = await aiofiles.os.stat(path)
     if time.time() - stat.st_mtime <= CACHE_LIVE_TIME:
         return True
@@ -143,13 +140,18 @@ async def handle_request(request, exception):
             return response.text('Forbiden', status=403)
 
     cache_path = _get_cache_file_path(parsed_url)
-    try:
-        if await _is_cache_valid(cache_path):
-            html = await _fetch_from_cache(cache_path)
-            logger.info('Got 200 for %s in cache', url)
-            return response.html(html, headers={'X-Prerender-Cache': 'hit'})
-    except Exception:
-        logger.exception('Error reading cache')
+    if os.path.exists(cache_path):
+        try:
+            if await _is_cache_valid(cache_path):
+                html = await _fetch_from_cache(cache_path)
+                logger.info('Got 200 for %s in cache', url)
+                return response.html(html, headers={'X-Prerender-Cache': 'hit'})
+            else:
+                # Delete outdated cache file
+                os.remove(cache_path)
+                logger.info('Removed outdated cache file %s', cache_path)
+        except Exception:
+            logger.exception('Error reading cache')
 
     if CONCURRENCY_PER_WORKER <= 0:
         # Read from cache only
