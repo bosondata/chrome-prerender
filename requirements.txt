@@ -2,6 +2,6 @@ websockets
 aiohttp
 ujson
 sanic
-aiofiles
 raven
 raven-aiohttp
+diskcache

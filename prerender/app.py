@@ -12,8 +12,7 @@ from multiprocessing import cpu_count
 from typing import Set
 
 import raven
-import aiofiles
-import aiofiles.os
+import diskcache
 from sanic import Sanic
 from sanic import response
 from sanic.exceptions import NotFound
@@ -29,6 +28,8 @@ ALLOWED_DOMAINS: Set = set(dm.strip() for dm in os.environ.get('PRERENDER_ALLOWE
 CACHE_ROOT_DIR: str = os.environ.get('CACHE_ROOT_DIR', '/tmp/prerender')
 CACHE_LIVE_TIME: int = int(os.environ.get('CACHE_LIVE_TIME', 3600))
 SENTRY_DSN = os.environ.get('SENTRY_DSN')
+
+cache = diskcache.Cache(CACHE_ROOT_DIR)
 if SENTRY_DSN:
     sentry = raven.Client(
         SENTRY_DSN,
@@ -40,40 +41,20 @@ else:
     sentry = None
 
 
-def _get_cache_file_path(parsed_url: str) -> str:
-    path = parsed_url.hostname
-    path = os.path.join(path, os.path.normpath(parsed_url.path[1:]))
-    if parsed_url.query:
-        path = os.path.join(path, os.path.normpath(parsed_url.query))
-    return os.path.join(CACHE_ROOT_DIR, path, 'prerender.cache.html')
-
-
-async def _fetch_from_cache(path: str) -> str:
+async def _fetch_from_cache(key: str) -> str:
     loop = asyncio.get_event_loop()
-    async with aiofiles.open(path, mode='rb') as f:
-        res = await loop.run_in_executor(None, lzma.decompress, await f.read())
+    data = cache.get(key)
+    if data is not None:
+        res = await loop.run_in_executor(None, lzma.decompress, data)
         return res.decode('utf-8')
 
 
-def _save_to_cache(path, html: str) -> None:
-    save_dir = os.path.dirname(path)
-    try:
-        os.makedirs(save_dir, 0o755)
-    except OSError:
-        pass
+def _save_to_cache(key, html: str) -> None:
     try:
         compressed = lzma.compress(html.encode('utf-8'))
-        with open(path, mode='wb') as f:
-            f.write(compressed)
+        cache.set(key, compressed, expire=CACHE_LIVE_TIME)
     except Exception:
         logger.exception('Error writing cache')
-
-
-async def _is_cache_valid(path: str) -> bool:
-    stat = await aiofiles.os.stat(path)
-    if time.time() - stat.st_mtime <= CACHE_LIVE_TIME:
-        return True
-    return False
 
 
 app = Sanic(__name__)
@@ -139,19 +120,13 @@ async def handle_request(request, exception):
         if parsed_url.hostname not in ALLOWED_DOMAINS:
             return response.text('Forbiden', status=403)
 
-    cache_path = _get_cache_file_path(parsed_url)
-    if os.path.exists(cache_path):
-        try:
-            if await _is_cache_valid(cache_path):
-                html = await _fetch_from_cache(cache_path)
-                logger.info('Got 200 for %s in cache', url)
-                return response.html(html, headers={'X-Prerender-Cache': 'hit'})
-            else:
-                # Delete outdated cache file
-                os.remove(cache_path)
-                logger.info('Removed outdated cache file %s', cache_path)
-        except Exception:
-            logger.exception('Error reading cache')
+    try:
+        html = await _fetch_from_cache(url)
+        if html is not None:
+            logger.info('Got 200 for %s in cache', url)
+            return response.html(html, headers={'X-Prerender-Cache': 'hit'})
+    except Exception:
+        logger.exception('Error reading cache')
 
     if CONCURRENCY_PER_WORKER <= 0:
         # Read from cache only
@@ -163,7 +138,7 @@ async def handle_request(request, exception):
         html = await _render(request.app.prerender, url)
         duration_ms = int((time.time() - start_time) * 1000)
         logger.info('Got 200 for %s in %dms', url, duration_ms)
-        executor.submit(_save_to_cache, cache_path, html)
+        executor.submit(_save_to_cache, url, html)
         return response.html(html, headers={'X-Prerender-Cache': 'miss'})
     except (asyncio.TimeoutError, asyncio.CancelledError, TemporaryBrowserFailure):
         duration_ms = int((time.time() - start_time) * 1000)
