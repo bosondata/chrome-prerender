@@ -43,7 +43,7 @@ else:
 
 async def _fetch_from_cache(key: str) -> str:
     loop = asyncio.get_event_loop()
-    data = cache.get(key)
+    data = await loop.run_in_executor(None, cache.get, key)
     if data is not None:
         res = await loop.run_in_executor(None, lzma.decompress, data)
         return res.decode('utf-8')
