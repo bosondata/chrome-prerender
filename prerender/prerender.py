@@ -13,10 +13,12 @@ logger = logging.getLogger(__name__)
 PRERENDER_TIMEOUT: int = int(os.environ.get('PRERENDER_TIMEOUT', 30))
 CONCURRENCY_PER_WORKER: int = int(os.environ.get('CONCURRENCY', cpu_count() * 2))
 MAX_ITERATIONS: int = int(os.environ.get('ITERATIONS', 200))
+CHROME_HOST: int = int(os.environ.get('CHROME_HOST', 'localhost'))
+CHROME_PORT: int = int(os.environ.get('CHROME_PORT', 9222))
 
 
 class Prerender:
-    def __init__(self, host: str = 'localhost', port: int = 9222, loop=None):
+    def __init__(self, host: str = CHROME_HOST, port: int = CHROME_PORT, loop=None):
         self.host = host
         self.port = port
         self.loop = loop
