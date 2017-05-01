@@ -41,16 +41,10 @@ As standalone application:
 $ prerender
 ```
 
-To run it under gunicorn, first install some dependencies:
+To run it under gunicorn:
 
 ```bash
-$ pip install sanic-gunicorn
-```
-
-Then:
-
-```bash
-$ gunicorn --bind 0.0.0.0:3000 --worker-class sanic_gunicorn.Worker prerender.app:app
+$ gunicorn --bind 0.0.0.0:3000 --worker-class sanic.worker.GunicornWorker prerender.app:app
 ```
 
 ## Configure client
