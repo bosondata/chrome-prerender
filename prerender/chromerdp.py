@@ -66,12 +66,14 @@ class Page:
 
     def _reset(self) -> None:
         self.websocket = None
-        self._request_id = 0
-        self._get_html_request_id = -1
+        self._request_id: int = 0
+        self._get_html_request_id: int = -1
         self._eval_request_ids = set()
-        self._load_event_fired = False
-        self._prerender_ready = False
-        self._get_document_request_id = -1
+        self._load_event_fired: bool = False
+        self._prerender_ready: bool = False
+        self._get_document_request_id: int = -1
+        self._requests_sent: int = 0
+        self._responses_received: int = 0
 
     @property
     def next_request_id(self) -> int:
@@ -99,6 +101,11 @@ class Page:
         await self.send({
             'id': self.next_request_id,
             'method': 'Log.enable'
+        })
+        await self.recv()
+        await self.send({
+            'id': self.next_request_id,
+            'method': 'Network.enable'
         })
         await self.recv()
 
@@ -139,6 +146,7 @@ class Page:
 
     async def wait(self) -> str:
         while True:
+            logger.debug('Requests sent: %d, responses received: %d', self._requests_sent, self._responses_received)
             obj = await self.recv()
             method = obj.get('method')
             if method == 'Inspector.detached':
@@ -163,6 +171,21 @@ class Page:
                              entry['text'])
                 continue
 
+            if method == 'Network.requestWillBeSent':
+                self._requests_sent += 1
+                continue
+            if method == 'Network.responseReceived':
+                self._responses_received += 1
+                continue
+            if method == 'Network.requestServedFromCache':
+                self._responses_received += 1
+                continue
+            if not self._prerender_ready and self._load_event_fired and self._requests_sent > 0 \
+                    and self._requests_sent == self._responses_received:
+                self._prerender_ready = True
+                await self.get_document()
+                continue
+
             if method == 'Page.loadEventFired':
                 self._load_event_fired = True
                 continue
@@ -178,9 +201,11 @@ class Page:
                     self._prerender_ready = True
                     self._eval_request_ids.clear()
                     await self.get_document()
+                    continue
             elif req_id == self._get_document_request_id:
                 node_id = obj['result']['root']['nodeId']
                 await self.get_html(node_id)
+                continue
             elif req_id == self._get_html_request_id:
                 html = obj['result']['outerHTML']
                 return html
