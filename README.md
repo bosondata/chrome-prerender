@@ -2,8 +2,6 @@
 
 Render JavaScript-rendered page as HTML using headless Chrome
 
-**Currently only the `window.prerenderReady` inspection is supported.**
-
 ## Install Chrome Headless
 
 Chrome Headless broweser can be easily installed using Docker:
