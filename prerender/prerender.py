@@ -43,7 +43,7 @@ class Prerender:
             await page.close()
         self._rdp.shutdown()
 
-    async def render(self, url: str) -> str:
+    async def render(self, url: str, format: str = 'html') -> str:
         if not self._pages:
             raise RuntimeError('No browser available')
 
@@ -62,8 +62,8 @@ class Prerender:
                 reopen = True
                 raise TemporaryBrowserFailure('Attach to Chrome page timed out')
             await page.navigate(url)
-            html = await asyncio.wait_for(page.wait(), timeout=PRERENDER_TIMEOUT)
-            return html
+            data = await asyncio.wait_for(page.wait(format), timeout=PRERENDER_TIMEOUT)
+            return data
         except InvalidHandshake:
             logger.error('Chrome invalid handshake for page %s', page.id)
             reopen = True

@@ -1,10 +1,11 @@
 import logging
-import asyncio
-from typing import List, Dict
+from typing import List, Dict, AnyStr
 
 import ujson as json
 import aiohttp
 import websockets
+
+from .mhtml import MHTML
 
 
 logger = logging.getLogger(__name__)
@@ -73,7 +74,8 @@ class Page:
         self._prerender_ready: bool = False
         self._get_document_request_id: int = -1
         self._requests_sent: int = 0
-        self._responses_received: int = 0
+        self._responses_received = {}
+        self._res_body_request_ids = {}
 
     @property
     def next_request_id(self) -> int:
@@ -144,9 +146,12 @@ class Page:
             'params': {'expression': expr}
         })
 
-    async def wait(self) -> str:
+    async def wait(self, format: str = 'html') -> AnyStr:
+        if format == 'mhtml':
+            mhtml = MHTML()
         while True:
-            logger.debug('Requests sent: %d, responses received: %d', self._requests_sent, self._responses_received)
+            logger.debug('Requests sent: %d, responses received: %d',
+                         self._requests_sent, len(self._responses_received))
             obj = await self.recv()
             method = obj.get('method')
             if method == 'Inspector.detached':
@@ -175,15 +180,16 @@ class Page:
                 self._requests_sent += 1
                 continue
             if method == 'Network.responseReceived':
-                self._responses_received += 1
-                continue
-            if method == 'Network.requestServedFromCache':
-                self._responses_received += 1
+                self._responses_received[obj['params']['requestId']] = obj['params']
+                await self.get_response_body(obj['params']['requestId'])
                 continue
             if not self._prerender_ready and self._load_event_fired and self._requests_sent > 0 \
-                    and self._requests_sent == self._responses_received:
+                    and len(self._responses_received) >= self._requests_sent and len(self._res_body_request_ids) == 0:
                 self._prerender_ready = True
-                await self.get_document()
+                if format == 'html':
+                    await self.get_document()
+                elif format == 'mhtml':
+                    return bytes(mhtml)
                 continue
 
             if method == 'Page.loadEventFired':
@@ -200,8 +206,21 @@ class Page:
                 if obj['result']['result']['value']:
                     self._prerender_ready = True
                     self._eval_request_ids.clear()
-                    await self.get_document()
+                    if format == 'html':
+                        await self.get_document()
+                    elif format == 'mhtml':
+                        return bytes(mhtml)
                     continue
+            elif req_id in self._res_body_request_ids:
+                body = obj['result']['body']
+                base64_encoded = obj['result']['base64Encoded']
+                if format == 'mhtml':
+                    request_id = self._res_body_request_ids[req_id]
+                    response = self._responses_received[request_id]['response']
+                    encoding = 'base64-encoded' if base64_encoded else 'quoted-printable'
+                    mhtml.add(response['url'], response['mimeType'], body, encoding)
+                self._res_body_request_ids.pop(req_id)
+                continue
             elif req_id == self._get_document_request_id:
                 node_id = obj['result']['root']['nodeId']
                 await self.get_html(node_id)
@@ -223,6 +242,15 @@ class Page:
             'id': self._get_html_request_id,
             'method': 'DOM.getOuterHTML',
             'params': {'nodeId': node_id}
+        })
+
+    async def get_response_body(self, request_id: str) -> None:
+        req_id = self.next_request_id
+        self._res_body_request_ids[req_id] = request_id
+        await self.send({
+            'id': req_id,
+            'method': 'Network.getResponseBody',
+            'params': {'requestId': request_id}
         })
 
     async def close(self) -> None:
