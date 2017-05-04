@@ -1,0 +1,8 @@
+linter:
+  - flake8
+
+branch:
+  - master
+
+notification:
+  email: tech@bosondata.com.cn
