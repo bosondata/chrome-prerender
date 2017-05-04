@@ -177,7 +177,9 @@ class Page:
                 continue
 
             if method == 'Network.requestWillBeSent':
-                self._requests_sent += 1
+                redirect = obj['params'].get('redirectResponse')
+                if not redirect:
+                    self._requests_sent += 1
                 continue
             if method == 'Network.responseReceived':
                 self._responses_received[obj['params']['requestId']] = obj['params']
