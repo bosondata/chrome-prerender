@@ -181,6 +181,8 @@ class Page:
                 continue
             if method == 'Network.responseReceived':
                 self._responses_received[obj['params']['requestId']] = obj['params']
+                continue
+            if method == 'Network.loadingFinished':
                 await self.get_response_body(obj['params']['requestId'])
                 continue
             if not self._prerender_ready and self._load_event_fired and self._requests_sent > 0 \
