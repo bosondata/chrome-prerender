@@ -46,12 +46,12 @@ async def _fetch_from_cache(key: str) -> str:
     data = await loop.run_in_executor(None, cache.get, key)
     if data is not None:
         res = await loop.run_in_executor(None, lzma.decompress, data)
-        return res.decode('utf-8')
+        return res
 
 
-def _save_to_cache(key, html: str) -> None:
+def _save_to_cache(key, html: bytes) -> None:
     try:
-        compressed = lzma.compress(html.encode('utf-8'))
+        compressed = lzma.compress(html)
         cache.set(key, compressed, expire=CACHE_LIVE_TIME)
     except Exception:
         logger.exception('Error writing cache')
@@ -93,11 +93,11 @@ async def enable_browser_rendering(request):
     return response.json({'message': 'success'})
 
 
-async def _render(prerender: Prerender, url: str) -> str:
+async def _render(prerender: Prerender, url: str, format: str = 'html') -> str:
     '''Retry once after TemporaryBrowserFailure occurred.'''
     for i in range(2):
         try:
-            return await prerender.render(url)
+            return await prerender.render(url, format)
         except TemporaryBrowserFailure as e:
             if i < 1:
                 logger.warning('Temporary browser failure: %s, retry rendering %s in 1s', str(e), url)
@@ -109,9 +109,13 @@ async def _render(prerender: Prerender, url: str) -> str:
 @app.exception(NotFound)
 async def handle_request(request, exception):
     # compatible with Sanic 0.4.1+
+    format = 'html'
     url = getattr(request, 'path', request.url)
     if url.startswith('/http'):
         url = url[1:]
+    elif url.startswith('/mhtml/http'):
+        format = 'mhtml'
+        url = url[7:]
     if request.query_string:
         url = url + '?' + request.query_string
     parsed_url = urlparse(url)
@@ -123,11 +127,16 @@ async def handle_request(request, exception):
         if parsed_url.hostname not in ALLOWED_DOMAINS:
             return response.text('Forbiden', status=403)
 
+    cache_key = url
+    if format == 'mhtml':
+        cache_key += '.mhtml'
     try:
-        html = await _fetch_from_cache(url)
-        if html is not None:
+        data = await _fetch_from_cache(cache_key)
+        if data is not None:
             logger.info('Got 200 for %s in cache', url)
-            return response.html(html, headers={'X-Prerender-Cache': 'hit'})
+            if format == 'mhtml':
+                return response.raw(data, headers={'X-Prerender-Cache': 'hit'})
+            return response.html(data.decode('utf-8'), headers={'X-Prerender-Cache': 'hit'})
     except Exception:
         logger.exception('Error reading cache')
 
@@ -138,11 +147,14 @@ async def handle_request(request, exception):
 
     start_time = time.time()
     try:
-        html = await _render(request.app.prerender, url)
+        data = await _render(request.app.prerender, url, format)
         duration_ms = int((time.time() - start_time) * 1000)
         logger.info('Got 200 for %s in %dms', url, duration_ms)
-        executor.submit(_save_to_cache, url, html)
-        return response.html(html, headers={'X-Prerender-Cache': 'miss'})
+        if format == 'mhtml':
+            executor.submit(_save_to_cache, cache_key, data)
+            return response.raw(data, headers={'X-Prerender-Cache': 'miss'})
+        executor.submit(_save_to_cache, cache_key, data.encode('utf-8'))
+        return response.html(data, headers={'X-Prerender-Cache': 'miss'})
     except (asyncio.TimeoutError, asyncio.CancelledError, TemporaryBrowserFailure):
         duration_ms = int((time.time() - start_time) * 1000)
         logger.warning('Got 504 for %s in %dms', url, duration_ms)
