@@ -212,13 +212,14 @@ class Page:
                         return bytes(mhtml)
                     continue
             elif req_id in self._res_body_request_ids:
-                body = obj['result']['body']
-                base64_encoded = obj['result']['base64Encoded']
-                if format == 'mhtml':
-                    request_id = self._res_body_request_ids[req_id]
-                    response = self._responses_received[request_id]['response']
-                    encoding = 'base64-encoded' if base64_encoded else 'quoted-printable'
-                    mhtml.add(response['url'], response['mimeType'], body, encoding)
+                body = obj['result'].get('body')
+                if body is not None:
+                    base64_encoded = obj['result']['base64Encoded']
+                    if format == 'mhtml':
+                        request_id = self._res_body_request_ids[req_id]
+                        response = self._responses_received[request_id]['response']
+                        encoding = 'base64-encoded' if base64_encoded else 'quoted-printable'
+                        mhtml.add(response['url'], response['mimeType'], body, encoding)
                 self._res_body_request_ids.pop(req_id)
                 continue
             elif req_id == self._get_document_request_id:
