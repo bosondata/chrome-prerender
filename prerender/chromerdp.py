@@ -186,7 +186,8 @@ class Page:
                 self._responses_received[obj['params']['requestId']] = obj['params']
                 continue
             if method == 'Network.loadingFinished':
-                await self.get_response_body(obj['params']['requestId'])
+                if format == 'mhtml':
+                    await self.get_response_body(obj['params']['requestId'])
                 continue
             if not self._prerender_ready and self._load_event_fired and self._requests_sent > 0 \
                     and len(self._responses_received) >= self._requests_sent and len(self._res_body_request_ids) == 0:
