@@ -116,6 +116,9 @@ async def handle_request(request, exception):
     elif url.startswith('/mhtml/http'):
         format = 'mhtml'
         url = url[7:]
+    elif url.startswith('/pdf/http'):
+        format = 'pdf'
+        url = url[5:]
     if request.query_string:
         url = url + '?' + request.query_string
     parsed_url = urlparse(url)
@@ -128,15 +131,15 @@ async def handle_request(request, exception):
             return response.text('Forbiden', status=403)
 
     cache_key = url
-    if format == 'mhtml':
-        cache_key += '.mhtml'
+    if format != 'html':
+        cache_key += format
     try:
         data = await _fetch_from_cache(cache_key)
         if data is not None:
             logger.info('Got 200 for %s in cache', url)
-            if format == 'mhtml':
-                return response.raw(data, headers={'X-Prerender-Cache': 'hit'})
-            return response.html(data.decode('utf-8'), headers={'X-Prerender-Cache': 'hit'})
+            if format == 'html':
+                return response.html(data.decode('utf-8'), headers={'X-Prerender-Cache': 'hit'})
+            return response.raw(data, headers={'X-Prerender-Cache': 'hit'})
     except Exception:
         logger.exception('Error reading cache')
 
@@ -150,11 +153,11 @@ async def handle_request(request, exception):
         data = await _render(request.app.prerender, url, format)
         duration_ms = int((time.time() - start_time) * 1000)
         logger.info('Got 200 for %s in %dms', url, duration_ms)
-        if format == 'mhtml':
-            executor.submit(_save_to_cache, cache_key, data)
-            return response.raw(data, headers={'X-Prerender-Cache': 'miss'})
-        executor.submit(_save_to_cache, cache_key, data.encode('utf-8'))
-        return response.html(data, headers={'X-Prerender-Cache': 'miss'})
+        if format == 'html':
+            executor.submit(_save_to_cache, cache_key, data.encode('utf-8'))
+            return response.html(data, headers={'X-Prerender-Cache': 'miss'})
+        executor.submit(_save_to_cache, cache_key, data)
+        return response.raw(data, headers={'X-Prerender-Cache': 'miss'})
     except (asyncio.TimeoutError, asyncio.CancelledError, TemporaryBrowserFailure):
         duration_ms = int((time.time() - start_time) * 1000)
         logger.warning('Got 504 for %s in %dms', url, duration_ms)

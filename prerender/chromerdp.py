@@ -1,3 +1,4 @@
+import base64
 import logging
 from typing import List, Dict, AnyStr
 
@@ -68,7 +69,7 @@ class Page:
     def _reset(self) -> None:
         self.websocket = None
         self._request_id: int = 0
-        self._get_html_request_id: int = -1
+        self._get_final_data_request_id: int = -1
         self._eval_request_ids = set()
         self._load_event_fired: bool = False
         self._prerender_ready: bool = False
@@ -194,6 +195,8 @@ class Page:
                     await self.get_document()
                 elif format == 'mhtml':
                     return bytes(mhtml)
+                elif format == 'pdf':
+                    await self.print_to_pdf()
                 continue
 
             if method == 'Page.loadEventFired':
@@ -214,6 +217,8 @@ class Page:
                         await self.get_document()
                     elif format == 'mhtml':
                         return bytes(mhtml)
+                    elif format == 'pdf':
+                        await self.print_to_pdf()
                     continue
             elif req_id in self._res_body_request_ids:
                 body = obj['result'].get('body')
@@ -230,9 +235,13 @@ class Page:
                 node_id = obj['result']['root']['nodeId']
                 await self.get_html(node_id)
                 continue
-            elif req_id == self._get_html_request_id:
-                html = obj['result']['outerHTML']
-                return html
+            elif req_id == self._get_final_data_request_id:
+                if format == 'html':
+                    html = obj['result']['outerHTML']
+                    return html
+                elif format == 'pdf':
+                    data = base64.b64decode(obj['result']['data'])
+                    return data
 
     async def get_document(self) -> None:
         self._get_document_request_id = self.next_request_id
@@ -242,9 +251,9 @@ class Page:
         })
 
     async def get_html(self, node_id: str) -> None:
-        self._get_html_request_id = self.next_request_id
+        self._get_final_data_request_id = self.next_request_id
         await self.send({
-            'id': self._get_html_request_id,
+            'id': self._get_final_data_request_id,
             'method': 'DOM.getOuterHTML',
             'params': {'nodeId': node_id}
         })
@@ -256,6 +265,13 @@ class Page:
             'id': req_id,
             'method': 'Network.getResponseBody',
             'params': {'requestId': request_id}
+        })
+
+    async def print_to_pdf(self) -> None:
+        self._get_final_data_request_id = self.next_request_id
+        await self.send({
+            'id': self._get_final_data_request_id,
+            'method': 'Page.printToPDF',
         })
 
     async def close(self) -> None:
