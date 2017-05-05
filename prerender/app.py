@@ -1,7 +1,6 @@
 import os
 import sys
 import time
-import lzma
 import logging
 import logging.config
 import asyncio
@@ -12,24 +11,22 @@ from multiprocessing import cpu_count
 from typing import Set
 
 import raven
-import diskcache
 from sanic import Sanic
 from sanic import response
 from sanic.exceptions import NotFound
 from raven_aiohttp import AioHttpTransport
 
 from .prerender import Prerender, CONCURRENCY_PER_WORKER, TemporaryBrowserFailure
+from .cache import cache
 
 
 logger = logging.getLogger(__name__)
 executor = ThreadPoolExecutor(max_workers=cpu_count() * 5)
 
 ALLOWED_DOMAINS: Set = set(dm.strip() for dm in os.environ.get('PRERENDER_ALLOWED_DOMAINS', '').split(',') if dm.strip())
-CACHE_ROOT_DIR: str = os.environ.get('CACHE_ROOT_DIR', '/tmp/prerender')
 CACHE_LIVE_TIME: int = int(os.environ.get('CACHE_LIVE_TIME', 3600))
 SENTRY_DSN = os.environ.get('SENTRY_DSN')
 
-cache = diskcache.Cache(CACHE_ROOT_DIR)
 if SENTRY_DSN:
     sentry = raven.Client(
         SENTRY_DSN,
@@ -41,18 +38,9 @@ else:
     sentry = None
 
 
-async def _fetch_from_cache(key: str) -> str:
-    loop = asyncio.get_event_loop()
-    data = await loop.run_in_executor(None, cache.get, key)
-    if data is not None:
-        res = await loop.run_in_executor(None, lzma.decompress, data)
-        return res
-
-
-def _save_to_cache(key, html: bytes) -> None:
+def _save_to_cache(key: str, data: bytes, format: str = 'html') -> None:
     try:
-        compressed = lzma.compress(html)
-        cache.set(key, compressed, expire=CACHE_LIVE_TIME)
+        cache.set(key, data, CACHE_LIVE_TIME, format)
     except Exception:
         logger.exception('Error writing cache')
 
@@ -130,11 +118,8 @@ async def handle_request(request, exception):
         if parsed_url.hostname not in ALLOWED_DOMAINS:
             return response.text('Forbiden', status=403)
 
-    cache_key = url
-    if format != 'html':
-        cache_key += format
     try:
-        data = await _fetch_from_cache(cache_key)
+        data = await cache.get(url, format)
         if data is not None:
             logger.info('Got 200 for %s in cache', url)
             if format == 'html':
@@ -154,9 +139,9 @@ async def handle_request(request, exception):
         duration_ms = int((time.time() - start_time) * 1000)
         logger.info('Got 200 for %s in %dms', url, duration_ms)
         if format == 'html':
-            executor.submit(_save_to_cache, cache_key, data.encode('utf-8'))
+            executor.submit(_save_to_cache, url, data.encode('utf-8'), format)
             return response.html(data, headers={'X-Prerender-Cache': 'miss'})
-        executor.submit(_save_to_cache, cache_key, data)
+        executor.submit(_save_to_cache, url, data, format)
         return response.raw(data, headers={'X-Prerender-Cache': 'miss'})
     except (asyncio.TimeoutError, asyncio.CancelledError, TemporaryBrowserFailure):
         duration_ms = int((time.time() - start_time) * 1000)

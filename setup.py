@@ -47,6 +47,10 @@ setup(
     install_requires=requirements,
     include_package_data=True,
     tests_require=['pytest'],
+    extras_require={
+        'diskcache': ['diskcache'],
+        's3': ['minio'],
+    },
     cmdclass={'test': PyTest},
     entry_points='''
         [console_scripts]
