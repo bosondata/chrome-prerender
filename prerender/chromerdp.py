@@ -1,5 +1,6 @@
 import base64
 import logging
+import asyncio
 from typing import List, Dict, AnyStr
 
 import ujson as json
@@ -138,9 +139,10 @@ class Page:
         })
         await self.recv()
 
-    async def evaluate(self, expr: str) -> None:
+    async def evaluate(self, expr: str, check_value=True) -> None:
         request_id = self.next_request_id
-        self._eval_request_ids.add(request_id)
+        if check_value:
+            self._eval_request_ids.add(request_id)
         await self.send({
             'id': request_id,
             'method': 'Runtime.evaluate',
@@ -189,6 +191,8 @@ class Page:
                 if format == 'mhtml':
                     await self.get_response_body(obj['params']['requestId'])
                 continue
+            if method == 'Network.loadingFailed':
+                self._responses_received[obj['params']['requestId']] = obj['params']
             if not self._prerender_ready and self._load_event_fired and self._requests_sent > 0 \
                     and len(self._responses_received) >= self._requests_sent and len(self._res_body_request_ids) == 0:
                 self._prerender_ready = True
@@ -197,6 +201,8 @@ class Page:
                 elif format == 'mhtml':
                     return bytes(mhtml)
                 elif format == 'pdf':
+                    await self.evaluate('window.scrollTo(0, document.body.scrollHeight)', False)  # scroll to bottom
+                    await asyncio.sleep(1)
                     await self.print_to_pdf()
                 continue
 
