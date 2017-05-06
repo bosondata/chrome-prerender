@@ -29,7 +29,10 @@ class S3Cache(CacheBackend):
     async def get(self, key: str, format: str = 'html') -> bytes:
         path = self._filename(key, format)
         loop = asyncio.get_event_loop()
-        res = await loop.run_in_executor(None, self.client.get_object, S3_BUCKET, path)
+        try:
+            res = await loop.run_in_executor(None, self.client.get_object, S3_BUCKET, path)
+        except minio.error.NoSuchKey:
+            return
         return res.data
 
     def set(self, key: str, payload: bytes, ttl: int = None, format: str = 'html') -> None:
