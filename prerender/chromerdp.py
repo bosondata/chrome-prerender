@@ -149,106 +149,107 @@ class Page:
             'params': {'expression': expr}
         })
 
-    async def wait(self, format: str = 'html') -> AnyStr:
+    async def _handle_response(self, format: str, obj: Dict, mhtml: MHTML, future: asyncio.Future) -> None:
+        method = obj.get('method')
+        if method == 'Inspector.detached':
+            # Chrome page destroyed
+            raise TemporaryBrowserFailure('Inspector detached: {}'.format(obj['params']['reason']))
+        elif method == 'Inspector.targetCrashed':
+            # Chrome page crashed
+            raise TemporaryBrowserFailure('Inspector target crashed')
+        elif method == 'Log.entryAdded':
+            # Log browser console logs for debugging
+            entry = obj['params']['entry']
+            log_func = getattr(logger, entry['level'], None)
+            if log_func:
+                resource_info = entry.get('url', '')
+                if entry.get('lineNumber'):
+                    resource_info = '{}:{}'.format(resource_info, entry['lineNumber'])
+                log_func('%s console %s log %s: %s',
+                            resource_info,
+                            entry['source'],
+                            entry['level'],
+                            entry['text'])
+        elif method == 'Network.requestWillBeSent':
+            redirect = obj['params'].get('redirectResponse')
+            if not redirect:
+                self._requests_sent += 1
+        elif method == 'Network.responseReceived':
+            self._responses_received[obj['params']['requestId']] = obj['params']
+        elif method == 'Network.loadingFinished':
+            if format == 'mhtml':
+                await self.get_response_body(obj['params']['requestId'])
+        elif method == 'Network.loadingFailed':
+            self._responses_received[obj['params']['requestId']] = obj['params']
+        elif method == 'Page.loadEventFired':
+            self._load_event_fired = True
+
+        if not self._prerender_ready and self._load_event_fired and self._requests_sent > 0 \
+                and len(self._responses_received) >= self._requests_sent and len(self._res_body_request_ids) == 0:
+            self._prerender_ready = True
+            if format == 'html':
+                await self.get_document()
+            elif format == 'mhtml':
+                future.set_result(bytes(mhtml))
+            elif format == 'pdf':
+                await self.evaluate('window.scrollTo(0, document.body.scrollHeight)', False)  # scroll to bottom
+                await asyncio.sleep(1)
+                await self.print_to_pdf()
+
+        if not self._prerender_ready and self._load_event_fired:
+            await self.evaluate('window.prerenderReady == true')
+
+        req_id = obj.get('id')
+        if req_id is None:
+            return
+        if req_id in self._eval_request_ids:
+            if obj['result']['result']['value']:
+                self._prerender_ready = True
+                self._eval_request_ids.clear()
+                if format == 'html':
+                    await self.get_document()
+                elif format == 'mhtml':
+                    future.set_result(bytes(mhtml))
+                elif format == 'pdf':
+                    await self.print_to_pdf()
+        elif req_id in self._res_body_request_ids:
+            body = obj['result'].get('body')
+            if body is not None:
+                base64_encoded = obj['result']['base64Encoded']
+                if format == 'mhtml':
+                    request_id = self._res_body_request_ids[req_id]
+                    response = self._responses_received[request_id]['response']
+                    encoding = 'base64-encoded' if base64_encoded else 'quoted-printable'
+                    mhtml.add(response['url'], response['mimeType'], body, encoding)
+            self._res_body_request_ids.pop(req_id)
+        elif req_id == self._get_document_request_id:
+            node_id = obj['result']['root']['nodeId']
+            await self.get_html(node_id)
+        elif req_id == self._get_final_data_request_id:
+            if format == 'html':
+                html = obj['result']['outerHTML']
+                future.set_result(html)
+            elif format == 'pdf':
+                data = base64.b64decode(obj['result']['data'])
+                future.set_result(data)
+
+    async def _wait(self, format: str, future: asyncio.Future) -> None:
+        mhtml = None
         if format == 'mhtml':
             mhtml = MHTML()
         while True:
             logger.debug('Requests sent: %d, responses received: %d',
                          self._requests_sent, len(self._responses_received))
             obj = await self.recv()
-            method = obj.get('method')
-            if method == 'Inspector.detached':
-                # Chrome page destroyed
-                raise TemporaryBrowserFailure('Inspector detached: {}'.format(obj['params']['reason']))
-            if method == 'Inspector.targetCrashed':
-                # Chrome page crashed
-                raise TemporaryBrowserFailure('Inspector target crashed')
+            asyncio.ensure_future(self._handle_response(format, obj, mhtml, future))
 
-            if method == 'Log.entryAdded':
-                # Log browser console logs for debugging
-                entry = obj['params']['entry']
-                log_func = getattr(logger, entry['level'], None)
-                if log_func:
-                    resource_info = entry.get('url', '')
-                    if entry.get('lineNumber'):
-                        resource_info = '{}:{}'.format(resource_info, entry['lineNumber'])
-                    log_func('%s console %s log %s: %s',
-                             resource_info,
-                             entry['source'],
-                             entry['level'],
-                             entry['text'])
-                continue
-
-            if method == 'Network.requestWillBeSent':
-                redirect = obj['params'].get('redirectResponse')
-                if not redirect:
-                    self._requests_sent += 1
-                continue
-            if method == 'Network.responseReceived':
-                self._responses_received[obj['params']['requestId']] = obj['params']
-                continue
-            if method == 'Network.loadingFinished':
-                if format == 'mhtml':
-                    await self.get_response_body(obj['params']['requestId'])
-                continue
-            if method == 'Network.loadingFailed':
-                self._responses_received[obj['params']['requestId']] = obj['params']
-            if not self._prerender_ready and self._load_event_fired and self._requests_sent > 0 \
-                    and len(self._responses_received) >= self._requests_sent and len(self._res_body_request_ids) == 0:
-                self._prerender_ready = True
-                if format == 'html':
-                    await self.get_document()
-                elif format == 'mhtml':
-                    return bytes(mhtml)
-                elif format == 'pdf':
-                    await self.evaluate('window.scrollTo(0, document.body.scrollHeight)', False)  # scroll to bottom
-                    await asyncio.sleep(1)
-                    await self.print_to_pdf()
-                continue
-
-            if method == 'Page.loadEventFired':
-                self._load_event_fired = True
-                continue
-
-            if not self._prerender_ready and self._load_event_fired:
-                await self.evaluate('window.prerenderReady == true')
-
-            req_id = obj.get('id')
-            if req_id is None:
-                continue
-            if req_id in self._eval_request_ids:
-                if obj['result']['result']['value']:
-                    self._prerender_ready = True
-                    self._eval_request_ids.clear()
-                    if format == 'html':
-                        await self.get_document()
-                    elif format == 'mhtml':
-                        return bytes(mhtml)
-                    elif format == 'pdf':
-                        await self.print_to_pdf()
-                    continue
-            elif req_id in self._res_body_request_ids:
-                body = obj['result'].get('body')
-                if body is not None:
-                    base64_encoded = obj['result']['base64Encoded']
-                    if format == 'mhtml':
-                        request_id = self._res_body_request_ids[req_id]
-                        response = self._responses_received[request_id]['response']
-                        encoding = 'base64-encoded' if base64_encoded else 'quoted-printable'
-                        mhtml.add(response['url'], response['mimeType'], body, encoding)
-                self._res_body_request_ids.pop(req_id)
-                continue
-            elif req_id == self._get_document_request_id:
-                node_id = obj['result']['root']['nodeId']
-                await self.get_html(node_id)
-                continue
-            elif req_id == self._get_final_data_request_id:
-                if format == 'html':
-                    html = obj['result']['outerHTML']
-                    return html
-                elif format == 'pdf':
-                    data = base64.b64decode(obj['result']['data'])
-                    return data
+    async def wait(self, format: str = 'html') -> AnyStr:
+        future = asyncio.Future()
+        task = asyncio.ensure_future(self._wait(format, future))
+        try:
+            return await future
+        finally:
+            task.cancel()
 
     async def get_document(self) -> None:
         self._get_document_request_id = self.next_request_id
