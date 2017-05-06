@@ -101,11 +101,19 @@ async def handle_request(request, exception):
     url = getattr(request, 'path', request.url)
     if url.startswith('/http'):
         url = url[1:]
+    elif url.startswith('/html/http'):
+        url = url[6:]
     elif url.startswith('/mhtml/http'):
         format = 'mhtml'
         url = url[7:]
     elif url.startswith('/pdf/http'):
         format = 'pdf'
+        url = url[5:]
+    elif url.startswith('/jpeg/http'):
+        format = 'jpeg'
+        url = url[6:]
+    elif url.startswith('/png/http'):
+        format = 'png'
         url = url[5:]
     if request.query_string:
         url = url + '?' + request.query_string

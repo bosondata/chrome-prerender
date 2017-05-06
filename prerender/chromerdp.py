@@ -195,6 +195,8 @@ class Page:
                 await self.evaluate('window.scrollTo(0, document.body.scrollHeight)', False)  # scroll to bottom
                 await asyncio.sleep(1)
                 await self.print_to_pdf()
+            elif format == 'jpeg' or format == 'png':
+                await self.screenshot()
 
         if not self._prerender_ready and self._load_event_fired:
             await self.evaluate('window.prerenderReady == true')
@@ -212,6 +214,8 @@ class Page:
                     future.set_result(bytes(mhtml))
                 elif format == 'pdf':
                     await self.print_to_pdf()
+                elif format == 'jpeg' or format == 'png':
+                    await self.screenshot()
         elif req_id in self._res_body_request_ids:
             body = obj['result'].get('body')
             if body is not None:
@@ -229,7 +233,7 @@ class Page:
             if format == 'html':
                 html = obj['result']['outerHTML']
                 future.set_result(html)
-            elif format == 'pdf':
+            elif format in ('pdf', 'png', 'jpeg'):
                 data = base64.b64decode(obj['result']['data'])
                 future.set_result(data)
 
@@ -280,6 +284,14 @@ class Page:
         await self.send({
             'id': self._get_final_data_request_id,
             'method': 'Page.printToPDF',
+        })
+
+    async def screenshot(self, format: str = 'png') -> None:
+        self._get_final_data_request_id = self.next_request_id
+        await self.send({
+            'id': self._get_final_data_request_id,
+            'method': 'Page.captureScreenshot',
+            'params': {'format': format}
         })
 
     async def close(self) -> None:
