@@ -34,7 +34,13 @@ class S3Cache(CacheBackend):
 
     def set(self, key: str, payload: bytes, ttl: int = None, format: str = 'html') -> None:
         path = self._filename(key, format)
-        self.client.put_object(S3_BUCKET, path, io.BytesIO(payload), len(payload))
+        self.client.put_object(
+            S3_BUCKET,
+            path,
+            io.BytesIO(payload),
+            len(payload),
+            metadata={'url': key, 'ttl': ttl}
+        )
 
     def _filename(self, url, format):
         hex_name = codecs.encode(url.encode('utf-8'), 'hex').decode('utf-8')
