@@ -3,6 +3,7 @@ import io
 import codecs
 import asyncio
 from urllib.parse import urlparse
+from typing import Optional
 
 import minio
 
@@ -17,7 +18,7 @@ S3_BUCKET = os.environ.get('S3_BUCKET', 'prerender')
 
 
 class S3Cache(CacheBackend):
-    def __init__(self):
+    def __init__(self) -> None:
         self.client = minio.Minio(
             S3_SERVER,
             access_key=S3_ACCESS_KEY,
@@ -26,7 +27,7 @@ class S3Cache(CacheBackend):
             secure=S3_SERVER == 's3.amazonaws.com',
         )
 
-    async def get(self, key: str, format: str = 'html') -> bytes:
+    async def get(self, key: str, format: str = 'html') -> Optional[bytes]:
         path = self._filename(key, format)
         loop = asyncio.get_event_loop()
         try:

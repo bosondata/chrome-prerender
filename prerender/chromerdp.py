@@ -1,7 +1,7 @@
 import base64
 import logging
 import asyncio
-from typing import List, Dict, AnyStr
+from typing import List, Dict, AnyStr, Set, Optional
 
 import ujson as json
 import aiohttp
@@ -18,7 +18,7 @@ class TemporaryBrowserFailure(Exception):
 
 
 class ChromeRemoteDebugger:
-    def __init__(self, host: str, port: int, loop=None):
+    def __init__(self, host: str, port: int, loop=None) -> None:
         self._debugger_url = 'http://{}:{}'.format(host, port)
         self._session = aiohttp.ClientSession(loop=loop)
         self.loop = loop
@@ -59,7 +59,7 @@ class ChromeRemoteDebugger:
 
 
 class Page:
-    def __init__(self, debugger: ChromeRemoteDebugger, page_info: Dict, loop=None):
+    def __init__(self, debugger: ChromeRemoteDebugger, page_info: Dict, loop=None) -> None:
         self._debugger = debugger
         self.loop = loop
         self.id: str = page_info['id']
@@ -68,16 +68,16 @@ class Page:
         self._reset()
 
     def _reset(self) -> None:
-        self.websocket = None
+        self.websocket: Optional[websockets.WebSocketClientProtocol] = None
         self._request_id: int = 0
         self._get_final_data_request_id: int = -1
-        self._eval_request_ids = set()
+        self._eval_request_ids: Set[int] = set()
         self._load_event_fired: bool = False
         self._prerender_ready: bool = False
         self._get_document_request_id: int = -1
         self._requests_sent: int = 0
-        self._responses_received = {}
-        self._res_body_request_ids = {}
+        self._responses_received: Dict = {}
+        self._res_body_request_ids: Dict = {}
 
     @property
     def next_request_id(self) -> int:

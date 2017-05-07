@@ -1,8 +1,11 @@
 import os
 
+from .base import CacheBackend
+
 
 CACHE_BACKEND = os.environ.get('CACHE_BACKEND', 'dummy')
 
+cache: CacheBackend = None
 if CACHE_BACKEND == 'disk':
     from .disk import DiskCache
 

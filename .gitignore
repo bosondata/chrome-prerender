@@ -68,3 +68,5 @@ docs/_build/
 
 # Vagrant
 .vagrant/
+
+.mypy_cache/

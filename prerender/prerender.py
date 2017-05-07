@@ -2,7 +2,7 @@ import os
 import asyncio
 import logging
 from multiprocessing import cpu_count
-from typing import Dict
+from typing import List, Dict
 
 from websockets.exceptions import InvalidHandshake, ConnectionClosed
 
@@ -18,13 +18,13 @@ CHROME_PORT: int = int(os.environ.get('CHROME_PORT', 9222))
 
 
 class Prerender:
-    def __init__(self, host: str = CHROME_HOST, port: int = CHROME_PORT, loop=None):
+    def __init__(self, host: str = CHROME_HOST, port: int = CHROME_PORT, loop=None) -> None:
         self.host = host
         self.port = port
         self.loop = loop
         self._rdp = ChromeRemoteDebugger(host, port, loop=loop)
         self._pages = set()
-        self._idle_pages = asyncio.Queue(loop=self.loop)
+        self._idle_pages: asyncio.Queue = asyncio.Queue(loop=self.loop)
 
     async def bootstrap(self) -> None:
         for i in range(CONCURRENCY_PER_WORKER):
@@ -32,7 +32,7 @@ class Prerender:
             await self._idle_pages.put(page)
             self._pages.add(page)
 
-    async def pages(self) -> Dict:
+    async def pages(self) -> List[Dict]:
         return await self._rdp.pages()
 
     async def version(self) -> Dict:

@@ -1,7 +1,6 @@
 import base64
 import quopri
 from email.message import EmailMessage
-from typing import AnyStr
 
 
 class MHTML(object):
@@ -10,7 +9,7 @@ class MHTML(object):
         self._msg['MIME-Version'] = '1.0'
         self._msg.add_header('Content-Type', 'multipart/related', type='text/html')
 
-    def add(self, location: str, content_type: str, payload: AnyStr, encoding: str = 'quoted-printable') -> None:
+    def add(self, location: str, content_type: str, payload: str, encoding: str = 'quoted-printable') -> None:
         resource = EmailMessage()
         if content_type == 'text/html':
             resource.add_header('Content-Type', 'text/html', charset='utf-8')
