@@ -43,6 +43,8 @@ def _save_to_cache(key: str, data: bytes, format: str = 'html') -> None:
         cache.set(key, data, CACHE_LIVE_TIME, format)
     except Exception:
         logger.exception('Error writing cache')
+        if sentry:
+            sentry.captureException()
 
 
 app = Sanic(__name__)
