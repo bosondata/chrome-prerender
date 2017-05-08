@@ -135,6 +135,8 @@ async def handle_request(request, exception):
             return response.raw(data, headers={'X-Prerender-Cache': 'hit'})
     except Exception:
         logger.exception('Error reading cache')
+        if sentry:
+            sentry.captureException()
 
     if CONCURRENCY_PER_WORKER <= 0:
         # Read from cache only
