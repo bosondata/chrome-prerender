@@ -32,7 +32,7 @@ class S3Cache(CacheBackend):
         loop = asyncio.get_event_loop()
         try:
             res = await loop.run_in_executor(None, self.client.get_object, S3_BUCKET, path)
-        except minio.error.NoSuchKey:
+        except (minio.error.NoSuchKey, asyncio.CancelledError):
             return
         return res.data
 
