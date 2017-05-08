@@ -6,6 +6,8 @@ from urllib.parse import urlparse
 from typing import Optional
 
 import minio
+import urllib3
+import certifi
 
 from .base import CacheBackend
 
@@ -25,6 +27,17 @@ class S3Cache(CacheBackend):
             secret_key=S3_SECRET_KEY,
             region=S3_REGION,
             secure=S3_SERVER == 's3.amazonaws.com',
+        )
+        self.client._http = urllib3.PoolManager(
+            timeout=self.client._conn_timeout,
+            cert_reqs='CERT_REQUIRED',
+            ca_certs=certifi.where(),
+            retries=urllib3.Retry(
+                total=5,
+                backoff_factor=0.2,
+                status_forcelist=[500, 502, 503, 504]
+            ),
+            maxsize=20
         )
 
     async def get(self, key: str, format: str = 'html') -> Optional[bytes]:
