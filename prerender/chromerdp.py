@@ -241,11 +241,19 @@ class Page:
         mhtml = None
         if format == 'mhtml':
             mhtml = MHTML()
-        while True:
-            logger.debug('Requests sent: %d, responses received: %d',
-                         self._requests_sent, len(self._responses_received))
-            obj = await self.recv()
-            asyncio.ensure_future(self._handle_response(format, obj, mhtml, future))
+
+        tasks = []
+        try:
+            while True:
+                logger.debug('Requests sent: %d, responses received: %d',
+                            self._requests_sent, len(self._responses_received))
+                obj = await self.recv()
+                task = asyncio.ensure_future(self._handle_response(format, obj, mhtml, future))
+                task.add_done_callback(lambda t: tasks.remove(t))
+                tasks.append(task)
+        except asyncio.CancelledError:
+            for task in tasks:
+                task.cancel()
 
     async def wait(self, format: str = 'html') -> AnyStr:
         future = asyncio.Future()
