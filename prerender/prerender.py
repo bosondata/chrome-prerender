@@ -56,9 +56,9 @@ class Prerender:
         try:
             await page.attach()
             try:
-                await asyncio.wait_for(page.listen(), timeout=1)
+                await asyncio.wait_for(page.listen(), timeout=2)
             except asyncio.TimeoutError:
-                logger.error('Attach to Chrome page %s timed out in 1s, page is likely closed', page.id)
+                logger.error('Attach to Chrome page %s timed out in 2s, page is likely closed', page.id)
                 reopen = True
                 raise TemporaryBrowserFailure('Attach to Chrome page timed out')
             await page.navigate(url)

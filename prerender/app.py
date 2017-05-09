@@ -95,6 +95,7 @@ async def _render(prerender: Prerender, url: str, format: str = 'html') -> str:
 
 @app.exception(NotFound)
 async def handle_request(request, exception):
+    start_time = time.time()
     # compatible with Sanic 0.4.1+
     format = 'html'
     url = getattr(request, 'path', request.url)
@@ -128,7 +129,9 @@ async def handle_request(request, exception):
     try:
         data = await cache.get(url, format)
         if data is not None:
-            logger.info('Got 200 for %s in cache', url)
+            logger.info('Got 200 for %s in cache in %dms',
+                        url,
+                        int((time.time() - start_time) * 1000))
             if format == 'html':
                 return response.html(data.decode('utf-8'), headers={'X-Prerender-Cache': 'hit'})
             return response.raw(data, headers={'X-Prerender-Cache': 'hit'})
@@ -139,26 +142,30 @@ async def handle_request(request, exception):
 
     if CONCURRENCY_PER_WORKER <= 0:
         # Read from cache only
-        logger.warning('Got 502 for %s, prerender unavailable', url)
+        logger.warning('Got 502 for %s in %dms, prerender unavailable',
+                       url,
+                       int((time.time() - start_time) * 1000))
         return response.text('Bad Gateway', status=502)
 
-    start_time = time.time()
     try:
         data = await _render(request.app.prerender, url, format)
-        duration_ms = int((time.time() - start_time) * 1000)
-        logger.info('Got 200 for %s in %dms', url, duration_ms)
+        logger.info('Got 200 for %s in %dms',
+                    url,
+                    int((time.time() - start_time) * 1000))
         if format == 'html':
             executor.submit(_save_to_cache, url, data.encode('utf-8'), format)
             return response.html(data, headers={'X-Prerender-Cache': 'miss'})
         executor.submit(_save_to_cache, url, data, format)
         return response.raw(data, headers={'X-Prerender-Cache': 'miss'})
     except (asyncio.TimeoutError, asyncio.CancelledError, TemporaryBrowserFailure):
-        duration_ms = int((time.time() - start_time) * 1000)
-        logger.warning('Got 504 for %s in %dms', url, duration_ms)
+        logger.warning('Got 504 for %s in %dms',
+                       url,
+                       int((time.time() - start_time) * 1000))
         return response.text('Gateway timeout', status=504)
     except Exception:
-        duration_ms = int((time.time() - start_time) * 1000)
-        logger.exception('Internal Server Error for %s in %dms', url, duration_ms)
+        logger.exception('Internal Server Error for %s in %dms',
+                         url,
+                         int((time.time() - start_time) * 1000))
         if sentry:
             sentry.captureException()
         return response.text('Internal Server Error', status=500)
