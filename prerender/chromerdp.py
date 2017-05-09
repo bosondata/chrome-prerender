@@ -112,6 +112,11 @@ class Page:
             'method': 'Network.enable'
         })
         await self.recv()
+        await self.send({
+            'id': self.next_request_id,
+            'method': 'Inspector.enable'
+        })
+        await self.recv()
 
     async def send(self, payload: Dict):
         req_id = payload.get('id') or self.next_request_id
