@@ -48,6 +48,9 @@ def _save_to_cache(key: str, data: bytes, format: str = 'html') -> None:
 
 
 app = Sanic(__name__)
+app.config.from_object(dict(
+    KEEP_ALIVE=False,
+))
 
 
 @app.route('/browser/list')
