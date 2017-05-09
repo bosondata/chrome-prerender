@@ -174,15 +174,20 @@ class Page:
             redirect = obj['params'].get('redirectResponse')
             if not redirect:
                 self._requests_sent += 1
+            return
         elif method == 'Network.responseReceived':
             self._responses_received[obj['params']['requestId']] = obj['params']
+            return
         elif method == 'Network.loadingFinished':
             if format == 'mhtml':
                 await self.get_response_body(obj['params']['requestId'])
+            return
         elif method == 'Network.loadingFailed':
             self._responses_received[obj['params']['requestId']] = obj['params']
+            return
         elif method == 'Page.loadEventFired':
             self._load_event_fired = True
+            return
 
         if not self._prerender_ready and self._load_event_fired and self._requests_sent > 0 \
                 and len(self._responses_received) >= self._requests_sent and len(self._res_body_request_ids) == 0:
@@ -190,16 +195,19 @@ class Page:
             if format == 'html':
                 await self.get_document()
             elif format == 'mhtml':
-                future.set_result(bytes(mhtml))
+                if not future.done():
+                    future.set_result(bytes(mhtml))
             elif format == 'pdf':
                 await self.evaluate('window.scrollTo(0, document.body.scrollHeight)', False)  # scroll to bottom
                 await asyncio.sleep(1)
                 await self.print_to_pdf()
             elif format == 'jpeg' or format == 'png':
                 await self.screenshot()
+            return
 
         if not self._prerender_ready and self._load_event_fired:
             await self.evaluate('window.prerenderReady == true')
+            return
 
         req_id = obj.get('id')
         if req_id is None:
@@ -211,7 +219,8 @@ class Page:
                 if format == 'html':
                     await self.get_document()
                 elif format == 'mhtml':
-                    future.set_result(bytes(mhtml))
+                    if not future.done():
+                        future.set_result(bytes(mhtml))
                 elif format == 'pdf':
                     await self.print_to_pdf()
                 elif format == 'jpeg' or format == 'png':
@@ -232,10 +241,12 @@ class Page:
         elif req_id == self._get_final_data_request_id:
             if format == 'html':
                 html = obj['result']['outerHTML']
-                future.set_result(html)
+                if not future.done():
+                    future.set_result(html)
             elif format in ('pdf', 'png', 'jpeg'):
                 data = base64.b64decode(obj['result']['data'])
-                future.set_result(data)
+                if not future.done():
+                    future.set_result(data)
 
     async def _wait(self, format: str, future: asyncio.Future) -> None:
         mhtml = None
