@@ -54,15 +54,13 @@ class Prerender:
 
         reopen = False
         try:
-            await page.attach()
             try:
-                await asyncio.wait_for(page.listen(), timeout=2)
+                await page.attach()
             except asyncio.TimeoutError:
-                logger.error('Attach to Chrome page %s timed out in 2s, page is likely closed', page.id)
+                logger.error('Attach to Chrome page %s timed out, page is likely closed', page.id)
                 reopen = True
                 raise TemporaryBrowserFailure('Attach to Chrome page timed out')
-            await page.navigate(url)
-            data = await asyncio.wait_for(page.wait(format), timeout=PRERENDER_TIMEOUT)
+            data = await asyncio.wait_for(page.render(url, format), timeout=PRERENDER_TIMEOUT)
             return data
         except InvalidHandshake:
             logger.error('Chrome invalid handshake for page %s', page.id)
