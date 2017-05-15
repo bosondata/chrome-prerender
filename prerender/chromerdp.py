@@ -157,7 +157,7 @@ class Page:
         obj = json.loads(res)
         return asyncio.ensure_future(self._handle_response(obj))
 
-    def on(self, event: str, callback: Optional[Callable[[Future], None]] = None) -> None:
+    def on(self, event: str, callback: Callable[[Future], None]) -> None:
         self._callbacks[event] = callback
 
     async def set_user_agent(self, ua: str) -> Future:
