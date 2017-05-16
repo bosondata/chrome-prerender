@@ -99,9 +99,8 @@ async def _render(prerender: Prerender, url: str, format: str = 'html') -> str:
 @app.exception(NotFound)
 async def handle_request(request, exception):
     start_time = time.time()
-    # compatible with Sanic 0.4.1+
     format = 'html'
-    url = getattr(request, 'path', request.url)
+    url = request.path
     if url.startswith('/http'):
         url = url[1:]
     elif url.startswith('/html/http'):

@@ -12,7 +12,7 @@ PORT: int = int(os.environ.get('PORT', 8000))
 
 def main() -> None:
     faulthandler.register(signal.SIGUSR1)
-    app.run(host=HOST, port=PORT, debug=DEBUG)
+    app.run(host=HOST, port=PORT, debug=DEBUG, log_config=None)
 
 
 if __name__ == '__main__':
