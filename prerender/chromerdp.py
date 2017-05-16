@@ -142,7 +142,7 @@ class Page:
         req_id = obj.get('id')
         if req_id is not None:
             future = self._futures.get(req_id)
-            if future is not None:
+            if future and not future.cancelled():
                 future.set_result(obj)
         method = obj.get('method')
         if method is not None:
