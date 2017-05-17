@@ -125,7 +125,7 @@ class Page:
         await asyncio.gather(*futures)
 
     def _remove_done_future(self, fut: Future, *, req_id: int) -> None:
-        del self._futures[req_id]
+        self._futures.pop(req_id, None)
         if not fut.cancelled() and fut.exception():
             self._render_future.set_exception(fut.exception())
 
