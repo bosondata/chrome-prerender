@@ -1,28 +1,17 @@
 # prerender
 
-Render JavaScript-rendered page as HTML using headless Chrome
+Render JavaScript-rendered page as HTML/PDF/mhtml/png/jpeg using headless Chrome
 
-## Install Chrome Headless
+## Install Chrome
 
-Chrome Headless broweser can be easily installed using Docker:
+Headless mode is supported in Chrome unstable/dev channel, you should be able to install it via:
 
-```bash
-$ docker pull yukinying/chrome-headless
-```
+https://www.google.com/chrome/browser/beta.html?platform=linux
 
 ## Start Chrome Headless
 
 ```bash
-$ docker run -i -t --shm-size=256m --rm --name=chrome-headless -p=127.0.0.1:9222:9222 yukinying/chrome-headless "about:blank"
-```
-
-Or you can download a Headless Chrome binary for Ubuntu 16.04 from GitHub release and run it:
-
-```bash
-$ wget https://github.com/bosondata/prerender/releases/download/v0.3.0/ChromeHeadless.ubuntu-16.04-x86_64.tar.gz
-$ tar zxvf ChromeHeadless.ubuntu-16.04-x86_64.tar.gz
-$ cd ChromeHeadless
-$ ./headless_shell --remote-debugging-port=9222 --disable-gpu "about:blank"
+$ google-chrome-unstable --headless --remote-debugging-port=9222 --disable-gpu "about:blank"
 ```
 
 ## Install Prerender
@@ -43,6 +32,24 @@ To run it under gunicorn:
 
 ```bash
 $ gunicorn --bind 0.0.0.0:3000 --worker-class sanic.worker.GunicornWorker prerender.app:app
+```
+
+## How does it work
+
+Say you deployed Prerender under `http://prerender.example.com:8000`, to render `http://example.com` you can do:
+
+```bash
+$ # render HTML
+$ curl http://prerender.example.com:8000/http://example.com
+$ curl http://prerender.example.com:8000/html/http://example.com
+$ # render mhtml
+$ curl http://prerender.example.com:8000/mhtml/http://example.com
+$ # render PDF
+$ curl http://prerender.example.com:8000/pdf/http://example.com
+$ # render png
+$ curl http://prerender.example.com:8000/png/http://example.com
+$ # render jpeg
+$ curl http://prerender.example.com:8000/jpeg/http://example.com
 ```
 
 ## Configure client
