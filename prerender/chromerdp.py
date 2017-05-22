@@ -263,6 +263,7 @@ class Page:
                         entry['text'])
 
     async def _on_loading_finished(self, obj: Dict, *, format: str) -> None:
+        self._last_active_time = time.time()
         if format == 'mhtml':
             await self.get_response_body(obj['params']['requestId'])
 
@@ -341,7 +342,7 @@ class Page:
     async def screenshot(self, format: str = 'png') -> bytes:
         future = await self.send({
             'method': 'Page.captureScreenshot',
-            'params': {'format': format}
+            'params': {'format': format, 'fromSurface': True}
         })
         obj = await future
         data = base64.b64decode(obj['result']['data'])
