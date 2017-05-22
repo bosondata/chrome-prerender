@@ -196,6 +196,8 @@ class Page:
         while True:
             if self._requests_sent > 0 and len(self._responses_received) >= self._requests_sent \
                     and len(self._res_body_request_ids) == 0 and time.time() - self._last_active_time > 1.0:
+                # Wait pending browser rendering for a while
+                await asyncio.sleep(0.5)
                 return
             await asyncio.sleep(0.5)
 
