@@ -108,6 +108,13 @@ class Page:
         self.on('Network.requestWillBeSent', self._on_request_will_be_sent)
         self.on('Network.responseReceived', self._on_response_received)
         self.on('Network.loadingFailed', self._on_response_received)
+        self.on('Network.dataReceived', self._update_last_active_time)
+        self.on('Network.resourceChangedPriority', self._update_last_active_time)
+        self.on('Page.frameAttached', self._update_last_active_time)
+        self.on('Page.frameNavigated', self._update_last_active_time)
+        self.on('Page.frameDetached', self._update_last_active_time)
+        self.on('Page.frameStartedLoading', self._update_last_active_time)
+        self.on('Page.frameStoppedLoading', self._update_last_active_time)
 
         self._ws_task = asyncio.ensure_future(self._listen())
         await asyncio.wait_for(self._enable_events(), timeout=5)
@@ -228,11 +235,14 @@ class Page:
             self._callbacks.clear()
             self._futures.clear()
 
+    def _update_last_active_time(self, _obj: Dict) -> None:
+        self._last_active_time = time.time()
+
     def _on_request_will_be_sent(self, obj: Dict) -> None:
         redirect = obj['params'].get('redirectResponse')
+        self._last_active_time = time.time()
         if not redirect:
             self._requests_sent += 1
-            self._last_active_time = time.time()
 
     def _on_response_received(self, obj: Dict) -> None:
         self._responses_received[obj['params']['requestId']] = obj['params']
@@ -250,6 +260,7 @@ class Page:
 
     def _on_log_entry_added(self, obj: Dict) -> None:
         # Log browser console logs for debugging
+        self._last_active_time = time.time()
         entry = obj['params']['entry']
         log_func = getattr(logger, entry['level'], None)
         if log_func:
