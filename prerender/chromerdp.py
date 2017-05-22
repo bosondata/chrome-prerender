@@ -1,4 +1,5 @@
 import math
+import time
 import base64
 import logging
 import inspect
@@ -86,6 +87,7 @@ class Page:
         self._requests_sent: int = 0
         self._responses_received: Dict = {}
         self._res_body_request_ids: Dict = {}
+        self._last_active_time: float = 0
 
     @property
     def _next_request_id(self) -> int:
@@ -193,7 +195,7 @@ class Page:
     async def _wait_responses_ready(self) -> None:
         while True:
             if self._requests_sent > 0 and len(self._responses_received) >= self._requests_sent \
-                    and len(self._res_body_request_ids) == 0:
+                    and len(self._res_body_request_ids) == 0 and time.time() - self._last_active_time > 1.0:
                 return
             await asyncio.sleep(0.5)
 
@@ -228,9 +230,11 @@ class Page:
         redirect = obj['params'].get('redirectResponse')
         if not redirect:
             self._requests_sent += 1
+            self._last_active_time = time.time()
 
     def _on_response_received(self, obj: Dict) -> None:
         self._responses_received[obj['params']['requestId']] = obj['params']
+        self._last_active_time = time.time()
         logger.debug('Requests sent: %d, responses received: %d',
                     self._requests_sent, len(self._responses_received))
 
