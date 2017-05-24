@@ -107,11 +107,23 @@ class Page:
         self.on('Network.loadingFailed', self._on_response_received)
         self.on('Network.dataReceived', self._update_last_active_time)
         self.on('Network.resourceChangedPriority', self._update_last_active_time)
+        self.on('Network.webSocketWillSendHandshakeRequest', self._update_last_active_time)
+        self.on('Network.webSocketHandshakeResponseReceived', self._update_last_active_time)
+        self.on('Network.webSocketCreated', self._update_last_active_time)
+        self.on('Network.webSocketClosed', self._update_last_active_time)
+        self.on('Network.webSocketFrameReceived', self._update_last_active_time)
+        self.on('Network.webSocketFrameError', self._update_last_active_time)
+        self.on('Network.webSocketFrameSent', self._update_last_active_time)
+        self.on('Network.eventSourceMessageReceived', self._update_last_active_time)
+        self.on('Page.domContentEventFired', self._update_last_active_time)
         self.on('Page.frameAttached', self._update_last_active_time)
         self.on('Page.frameNavigated', self._update_last_active_time)
         self.on('Page.frameDetached', self._update_last_active_time)
         self.on('Page.frameStartedLoading', self._update_last_active_time)
         self.on('Page.frameStoppedLoading', self._update_last_active_time)
+        self.on('DOM.documentUpdated', self._update_last_active_time)
+        self.on('LayerTree.layerTreeDidChange', self._update_last_active_time)
+        self.on('LayerTree.layerPainted', self._update_last_active_time)
 
         self._ws_task = asyncio.ensure_future(self._listen())
         await asyncio.wait_for(self._enable_events(), timeout=5)
@@ -124,9 +136,11 @@ class Page:
     async def _enable_events(self) -> None:
         futures = await asyncio.gather(
             self.send({'method': 'Page.enable'}),
+            self.send({'method': 'DOM.enable'}),
             self.send({'method': 'Log.enable'}),
             self.send({'method': 'Network.enable'}),
             self.send({'method': 'Inspector.enable'}),
+            self.send({'method': 'LayerTree.enable'}),
         )
         await asyncio.gather(*futures)
 
@@ -254,7 +268,7 @@ class Page:
                      self._requests_sent, len(self._responses_received))
 
         resp = obj['params'].get('response')
-        if not is_response_ok(resp):
+        if resp and not is_response_ok(resp):
             logger.warning('%s got status code %d', resp['url'], resp['status'])
 
     def _on_inspector_detached(self, obj: Dict) -> None:
