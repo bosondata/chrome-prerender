@@ -6,7 +6,8 @@ from typing import List, Dict
 
 from websockets.exceptions import InvalidHandshake, ConnectionClosed
 
-from .chromerdp import ChromeRemoteDebugger, Page, TemporaryBrowserFailure
+from .chromerdp import ChromeRemoteDebugger, Page
+from .exceptions import TemporaryBrowserFailure
 
 logger = logging.getLogger(__name__)
 

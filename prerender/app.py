@@ -16,8 +16,9 @@ from sanic import response
 from sanic.exceptions import NotFound
 from raven_aiohttp import AioHttpTransport
 
-from .prerender import Prerender, CONCURRENCY_PER_WORKER, TemporaryBrowserFailure
+from .prerender import Prerender, CONCURRENCY_PER_WORKER
 from .cache import cache
+from .exceptions import TemporaryBrowserFailure, TooManyResponseError
 
 
 logger = logging.getLogger(__name__)
@@ -164,6 +165,11 @@ async def handle_request(request, exception):
                        url,
                        int((time.time() - start_time) * 1000))
         return response.text('Gateway timeout', status=504)
+    except TooManyResponseError:
+        logger.warning('Too many response error for %s in %dms',
+                       url,
+                       int((time.time() - start_time) * 1000))
+        return response.text('Service unavailable', status=503)
     except Exception:
         logger.exception('Internal Server Error for %s in %dms',
                          url,
