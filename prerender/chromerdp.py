@@ -205,7 +205,7 @@ class Page:
                 break
             await asyncio.sleep(0.5)
 
-        succeed_res = sum([1 if is_response_ok(resp['response']) else 0
+        succeed_res = sum([1 if is_response_ok(resp.get('response')) else 0
                            for resp in self._responses_received.values()])
         success_rate = succeed_res / len(self._responses_received)
         if success_rate < 0.8:
@@ -253,7 +253,7 @@ class Page:
         logger.debug('Requests sent: %d, responses received: %d',
                      self._requests_sent, len(self._responses_received))
 
-        resp = obj['params']['response']
+        resp = obj['params'].get('response')
         if not is_response_ok(resp):
             logger.warning('%s got status code %d', resp['url'], resp['status'])
 
@@ -386,5 +386,7 @@ class Page:
 
 
 def is_response_ok(response):
+    if not response:
+        return False
     status = response['status']
     return status < 400
