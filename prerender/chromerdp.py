@@ -214,9 +214,11 @@ class Page:
         while True:
             if self._requests_sent > 0 and len(self._responses_received) >= self._requests_sent \
                     and len(self._res_body_request_ids) == 0 and time.time() - self._last_active_time > 1.0:
-                # Wait pending browser rendering for a while
-                await asyncio.sleep(0.5)
-                break
+                # Prefer window.prerenderReady
+                res = await self.evaluate('window.prerenderReady === undefined')
+                if res['result']['result'].get('value'):
+                    # Wait pending browser rendering for a while
+                    break
             await asyncio.sleep(0.5)
 
         succeed_res = sum([1 if is_response_ok(resp.get('response')) else 0
