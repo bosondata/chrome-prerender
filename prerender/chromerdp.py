@@ -13,13 +13,10 @@ import aiohttp
 import websockets
 
 from .mhtml import MHTML
+from .exceptions import TemporaryBrowserFailure, TooManyResponseError
 
 
 logger = logging.getLogger(__name__)
-
-
-class TemporaryBrowserFailure(Exception):
-    pass
 
 
 class ChromeRemoteDebugger:
@@ -205,8 +202,14 @@ class Page:
                     and len(self._res_body_request_ids) == 0 and time.time() - self._last_active_time > 1.0:
                 # Wait pending browser rendering for a while
                 await asyncio.sleep(0.5)
-                return
+                break
             await asyncio.sleep(0.5)
+
+        succeed_res = sum([1 if is_response_ok(resp['response']) else 0
+                           for resp in self._responses_received.values()])
+        success_rate = succeed_res / len(self._responses_received)
+        if success_rate < 0.8:
+            raise TooManyResponseError
 
     async def _listen(self) -> None:
         tasks = []
@@ -248,7 +251,11 @@ class Page:
         self._responses_received[obj['params']['requestId']] = obj['params']
         self._last_active_time = time.time()
         logger.debug('Requests sent: %d, responses received: %d',
-                    self._requests_sent, len(self._responses_received))
+                     self._requests_sent, len(self._responses_received))
+
+        resp = obj['params']['response']
+        if not is_response_ok(resp):
+            logger.warning('%s got status code %d', resp['url'], resp['status'])
 
     def _on_inspector_detached(self, obj: Dict) -> None:
         # Chrome page destroyed
@@ -282,12 +289,14 @@ class Page:
         if format in ('mhtml', 'pdf'):
             await self._scroll_to_bottom()
 
-        _done, pending = await asyncio.wait([
+        done, pending = await asyncio.wait([
             self._evaluate_prerender_ready(),
             self._wait_responses_ready(),
         ], return_when=asyncio.FIRST_COMPLETED)
         for task in pending:
             task.cancel()
+        for task in done:
+            task.result()  # To trigger exception if any
 
         if format == 'html':
             html = await self.get_html()
@@ -374,3 +383,8 @@ class Page:
 
     def __hash__(self) -> int:
         return hash(repr(self))
+
+
+def is_response_ok(response):
+    status = response['status']
+    return status < 400
