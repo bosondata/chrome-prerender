@@ -144,6 +144,17 @@ class Page:
         )
         await asyncio.gather(*futures)
 
+    async def _disable_events(self) -> None:
+        futures = await asyncio.gather(
+            self.send({'method': 'Page.disable'}),
+            self.send({'method': 'DOM.disable'}),
+            self.send({'method': 'Log.disable'}),
+            self.send({'method': 'Network.disable'}),
+            self.send({'method': 'Inspector.disable'}),
+            self.send({'method': 'LayerTree.disable'}),
+        )
+        await asyncio.gather(*futures)
+
     def _remove_done_future(self, fut: Future, *, req_id: int) -> None:
         self._futures.pop(req_id, None)
         if not fut.cancelled() and fut.exception():
@@ -253,6 +264,7 @@ class Page:
         finally:
             self._callbacks.clear()
             self._futures.clear()
+            await self._disable_events()
 
     def _update_last_active_time(self, _obj: Dict) -> None:
         self._last_active_time = time.time()
