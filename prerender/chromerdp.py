@@ -215,7 +215,7 @@ class Page:
             if self._requests_sent > 0 and len(self._responses_received) >= self._requests_sent \
                     and len(self._res_body_request_ids) == 0 and time.time() - self._last_active_time > 1.0:
                 # Prefer window.prerenderReady
-                res = await self.evaluate('window.prerenderReady === undefined')
+                res = await self.evaluate('typeof window.prerenderReady === "undefined"')
                 if res['result']['result'].get('value'):
                     # Wait pending browser rendering for a while
                     break
