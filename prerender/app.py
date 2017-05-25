@@ -24,7 +24,8 @@ from .exceptions import TemporaryBrowserFailure, TooManyResponseError
 logger = logging.getLogger(__name__)
 executor = ThreadPoolExecutor(max_workers=cpu_count() * 5)
 
-ALLOWED_DOMAINS: Set = set(dm.strip() for dm in os.environ.get('PRERENDER_ALLOWED_DOMAINS', '').split(',') if dm.strip())
+ALLOWED_DOMAINS: Set = set(dm.strip() for dm in
+                           os.environ.get('PRERENDER_ALLOWED_DOMAINS', '').split(',') if dm.strip())
 CACHE_LIVE_TIME: int = int(os.environ.get('CACHE_LIVE_TIME', 3600))
 SENTRY_DSN = os.environ.get('SENTRY_DSN')
 
@@ -151,15 +152,18 @@ async def handle_request(request, exception):
         return response.text('Bad Gateway', status=502)
 
     try:
-        data = await _render(request.app.prerender, url, format)
-        logger.info('Got 200 for %s in %dms',
+        data, status_code = await _render(request.app.prerender, url, format)
+        logger.info('Got %d for %s in %dms',
+                    status_code,
                     url,
                     int((time.time() - start_time) * 1000))
         if format == 'html':
-            executor.submit(_save_to_cache, url, data.encode('utf-8'), format)
-            return response.html(data, headers={'X-Prerender-Cache': 'miss'})
-        executor.submit(_save_to_cache, url, data, format)
-        return response.raw(data, headers={'X-Prerender-Cache': 'miss'})
+            if 200 <= status_code < 300:
+                executor.submit(_save_to_cache, url, data.encode('utf-8'), format)
+            return response.html(data, headers={'X-Prerender-Cache': 'miss'}, status=status_code)
+        if 200 <= status_code < 300:
+            executor.submit(_save_to_cache, url, data, format)
+        return response.raw(data, headers={'X-Prerender-Cache': 'miss'}, status=status_code)
     except (asyncio.TimeoutError, asyncio.CancelledError, TemporaryBrowserFailure):
         logger.warning('Got 504 for %s in %dms',
                        url,

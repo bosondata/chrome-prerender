@@ -6,7 +6,7 @@ import inspect
 import asyncio
 from asyncio import Future
 from functools import partial
-from typing import List, Dict, AnyStr, Set, Optional, Callable
+from typing import List, Dict, AnyStr, Callable
 
 import ujson as json
 import aiohttp
@@ -291,10 +291,10 @@ class Page:
             if entry.get('lineNumber'):
                 resource_info = '{}:{}'.format(resource_info, entry['lineNumber'])
             log_func('%s console %s log %s: %s',
-                        resource_info,
-                        entry['source'],
-                        entry['level'],
-                        entry['text'])
+                     resource_info,
+                     entry['source'],
+                     entry['level'],
+                     entry['text'])
 
     async def _on_loading_finished(self, obj: Dict, *, format: str) -> None:
         self._last_active_time = time.time()
@@ -314,17 +314,18 @@ class Page:
         for task in done:
             task.result()  # To trigger exception if any
 
+        status_code = await self.get_status_code()
         if format == 'html':
             html = await self.get_html()
-            self._render_future.set_result(html)
+            self._render_future.set_result((html, status_code))
         elif format == 'mhtml':
-            self._render_future.set_result(bytes(self._mhtml))
+            self._render_future.set_result((bytes(self._mhtml), status_code))
         elif format == 'pdf':
             data = await self.print_to_pdf()
-            self._render_future.set_result(data)
+            self._render_future.set_result((data, status_code))
         elif format == 'jpeg' or format == 'png':
             data = await self.screenshot(format)
-            self._render_future.set_result(data)
+            self._render_future.set_result((data, status_code))
 
     async def _scroll_to_bottom(self) -> None:
         # scroll to bottom to ensure images loaded
@@ -393,6 +394,16 @@ class Page:
 
     async def close(self) -> None:
         await self._debugger.close_page(self.id)
+
+    async def get_status_code(self) -> int:
+        res = await self.evaluate('window.prerenderStatusCode')
+        status = res['result']['result'].get('value')
+        if status is None or status == 'undefined':
+            return 200
+        try:
+            return int(status)
+        except (TypeError, ValueError):
+            return 200
 
     def __repr__(self) -> str:
         return '<Page #{}>'.format(self.id)
