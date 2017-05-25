@@ -6,11 +6,12 @@ import inspect
 import asyncio
 from asyncio import Future
 from functools import partial
-from typing import List, Dict, AnyStr, Callable
+from typing import List, Dict, AnyStr, Callable, Optional
 
 import ujson as json
 import aiohttp
 import websockets
+from multidict import CIMultiDict
 
 from .mhtml import MHTML
 from .exceptions import TemporaryBrowserFailure, TooManyResponseError
@@ -85,6 +86,7 @@ class Page:
         self._responses_received: Dict = {}
         self._res_body_request_ids: Dict = {}
         self._last_active_time: float = 0
+        self._url: Optional[str] = None
 
     @property
     def _next_request_id(self) -> int:
@@ -260,8 +262,10 @@ class Page:
         self.on('Network.loadingFinished', partial(self._on_loading_finished, format=format))
         try:
             await self.navigate(url)
+            self._url = url
             return await self._render_future
         finally:
+            self._url = None
             self._callbacks.clear()
             self._futures.clear()
             await self._disable_events()
@@ -274,6 +278,9 @@ class Page:
         self._last_active_time = time.time()
         if not redirect:
             self._requests_sent += 1
+        else:
+            if redirect['url'] == self._url:
+                self._url = CIMultiDict(redirect['headers'])['location']
 
     def _on_response_received(self, obj: Dict) -> None:
         self._responses_received[obj['params']['requestId']] = obj['params']
@@ -411,6 +418,13 @@ class Page:
         res = await self.evaluate('window.prerenderStatusCode')
         status = res['result']['result'].get('value')
         if status is None or status == 'undefined':
+            for item in self._responses_received.values():
+                res = item.get('response')
+                if not res:
+                    await asyncio.sleep(0)  # Let others run
+                    continue
+                if res['url'] == self._url:
+                    return res['status']
             return 200
         try:
             return int(status)
