@@ -6,7 +6,7 @@ import inspect
 import asyncio
 from asyncio import Future
 from functools import partial
-from typing import List, Dict, AnyStr, Callable, Optional
+from typing import List, Dict, AnyStr, Callable, Optional, Any
 
 import ujson as json
 import aiohttp
@@ -73,9 +73,9 @@ class Page:
         self._reset()
 
     def _reset(self) -> None:
-        self._ws_task = None
-        self._futures: Dict[str, Future] = {}
-        self._callbacks: Dict[str, Callable[[Dict], None]] = {}
+        self._ws_task: Optional[Future] = None
+        self._futures: Dict[int, Future] = {}
+        self._callbacks: Dict[str, Callable[[Dict], Any]] = {}
         self.websocket: Optional[websockets.WebSocketClientProtocol] = None
         self._request_id: int = 0
 
@@ -185,12 +185,12 @@ class Page:
                 if inspect.isawaitable(ret):
                     await ret
 
-    async def recv(self) -> asyncio.Task:
+    async def recv(self) -> Future:
         res = await self.websocket.recv()
         obj = json.loads(res)
         return asyncio.ensure_future(self._handle_response(obj))
 
-    def on(self, event: str, callback: Callable[[Future], None]) -> None:
+    def on(self, event: str, callback: Callable[[Dict], None]) -> None:
         self._callbacks[event] = callback
 
     async def set_user_agent(self, ua: str) -> Future:
@@ -241,9 +241,9 @@ class Page:
             raise TooManyResponseError
 
     async def _listen(self) -> None:
-        tasks = []
+        tasks: List[Future] = []
 
-        def _on_task_done(task: asyncio.Task) -> None:
+        def _on_task_done(task: Future) -> None:
             tasks.remove(task)
             if not task.cancelled() and task.exception():
                 self._render_future.set_exception(task.exception())
