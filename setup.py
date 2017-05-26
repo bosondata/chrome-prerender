@@ -37,7 +37,7 @@ with open('requirements.txt') as f:
 
 setup(
     name='prerender',
-    version='0.7.2',
+    version='0.7.3',
     author='messense',
     author_email='messense@icloud.com',
     packages=find_packages(exclude=('tests', 'tests.*')),
