@@ -130,19 +130,21 @@ async def handle_request(request, exception):
         if parsed_url.hostname not in ALLOWED_DOMAINS:
             return response.text('Forbiden', status=403)
 
-    try:
-        data = await cache.get(url, format)
-        if data is not None:
-            logger.info('Got 200 for %s in cache in %dms',
-                        url,
-                        int((time.time() - start_time) * 1000))
-            if format == 'html':
-                return response.html(data.decode('utf-8'), headers={'X-Prerender-Cache': 'hit'})
-            return response.raw(data, headers={'X-Prerender-Cache': 'hit'})
-    except Exception:
-        logger.exception('Error reading cache')
-        if sentry:
-            sentry.captureException()
+    skip_cache = request.method == 'POST'
+    if not skip_cache:
+        try:
+            data = await cache.get(url, format)
+            if data is not None:
+                logger.info('Got 200 for %s in cache in %dms',
+                            url,
+                            int((time.time() - start_time) * 1000))
+                if format == 'html':
+                    return response.html(data.decode('utf-8'), headers={'X-Prerender-Cache': 'hit'})
+                return response.raw(data, headers={'X-Prerender-Cache': 'hit'})
+        except Exception:
+            logger.exception('Error reading cache')
+            if sentry:
+                sentry.captureException()
 
     if CONCURRENCY_PER_WORKER <= 0:
         # Read from cache only
