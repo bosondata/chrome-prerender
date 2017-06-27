@@ -19,6 +19,7 @@ from raven_aiohttp import AioHttpTransport
 from .prerender import Prerender, CONCURRENCY_PER_WORKER
 from .cache import cache
 from .exceptions import TemporaryBrowserFailure, TooManyResponseError
+from .utils import remove_script_tags
 
 
 logger = logging.getLogger(__name__)
@@ -139,7 +140,10 @@ async def handle_request(request, exception):
                             url,
                             int((time.time() - start_time) * 1000))
                 if format == 'html':
-                    return response.html(data.decode('utf-8'), headers={'X-Prerender-Cache': 'hit'})
+                    return response.html(
+                        remove_script_tags(data.decode('utf-8')),
+                        headers={'X-Prerender-Cache': 'hit'}
+                    )
                 return response.raw(data, headers={'X-Prerender-Cache': 'hit'})
         except Exception:
             logger.exception('Error reading cache')
@@ -162,7 +166,11 @@ async def handle_request(request, exception):
         if format == 'html':
             if 200 <= status_code < 300:
                 executor.submit(_save_to_cache, url, data.encode('utf-8'), format)
-            return response.html(data, headers={'X-Prerender-Cache': 'miss'}, status=status_code)
+            return response.html(
+                remove_script_tags(data),
+                headers={'X-Prerender-Cache': 'miss'},
+                status=status_code
+            )
         if 200 <= status_code < 300:
             executor.submit(_save_to_cache, url, data, format)
         return response.raw(data, headers={'X-Prerender-Cache': 'miss'}, status=status_code)
