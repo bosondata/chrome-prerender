@@ -21,10 +21,11 @@ logger = logging.getLogger(__name__)
 
 
 class ChromeRemoteDebugger:
-    def __init__(self, host: str, port: int, loop=None) -> None:
+    def __init__(self, host: str, port: int, loop=None, user_agent: Optional[str] = None) -> None:
         self._debugger_url = 'http://{}:{}'.format(host, port)
         self._session = aiohttp.ClientSession(loop=loop)
         self.loop = loop
+        self.user_agent = user_agent
 
     async def pages(self) -> List[Dict]:
         async with self._session.get('{}/json/list'.format(self._debugger_url)) as res:
@@ -64,6 +65,7 @@ class ChromeRemoteDebugger:
 class Page:
     def __init__(self, debugger: ChromeRemoteDebugger, page_info: Dict, *, loop=None) -> None:
         self._debugger = debugger
+        self.user_agent: Optional[str] = debugger.user_agent
         self.loop = loop
         self.id: str = page_info['id']
         self.websocket_debugger_url: str = page_info['webSocketDebuggerUrl']
@@ -129,6 +131,8 @@ class Page:
 
         self._ws_task = asyncio.ensure_future(self._listen())
         await asyncio.wait_for(self._enable_events(), timeout=5)
+        if self.user_agent is not None:
+            await self.set_user_agent(self.user_agent)
 
     async def detach(self) -> None:
         self._ws_task.cancel()

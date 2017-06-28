@@ -2,7 +2,7 @@ import os
 import asyncio
 import logging
 from multiprocessing import cpu_count
-from typing import List, Dict
+from typing import List, Dict, Optional
 
 from websockets.exceptions import InvalidHandshake, ConnectionClosed
 
@@ -16,6 +16,7 @@ CONCURRENCY: int = int(os.environ.get('CONCURRENCY', cpu_count() * 2))
 MAX_ITERATIONS: int = int(os.environ.get('ITERATIONS', 200))
 CHROME_HOST: str = os.environ.get('CHROME_HOST', 'localhost')
 CHROME_PORT: int = int(os.environ.get('CHROME_PORT', 9222))
+USER_AGENT: Optional[str] = os.environ.get('USER_AGENT')
 
 
 class Prerender:
@@ -28,6 +29,16 @@ class Prerender:
         self._idle_pages: asyncio.Queue = asyncio.Queue(loop=self.loop)
 
     async def bootstrap(self) -> None:
+        if USER_AGENT:
+            user_agent = USER_AGENT
+        else:
+            try:
+                version = await self._rdp.version()
+                user_agent = 'Prerender {}'.format(version['User-Agent'])
+            except Exception:
+                user_agent = None
+        self._rdp.user_agent = user_agent
+
         for i in range(CONCURRENCY):
             page = await self._rdp.new_page()
             await self._idle_pages.put(page)
