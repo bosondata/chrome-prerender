@@ -16,7 +16,7 @@ from sanic import response
 from sanic.exceptions import NotFound
 from raven_aiohttp import AioHttpTransport
 
-from .prerender import Prerender, CONCURRENCY_PER_WORKER
+from .prerender import Prerender, CONCURRENCY
 from .cache import cache
 from .exceptions import TemporaryBrowserFailure, TooManyResponseError
 from .utils import remove_script_tags
@@ -72,17 +72,17 @@ async def show_brower_version(request):
 
 @app.route('/browser/disable', methods=['PUT'])
 async def disable_browser_rendering(request):
-    global CONCURRENCY_PER_WORKER
+    global CONCURRENCY
 
-    CONCURRENCY_PER_WORKER = 0
+    CONCURRENCY = 0
     return response.json({'message': 'success'})
 
 
 @app.route('/browser/enable', methods=['PUT'])
 async def enable_browser_rendering(request):
-    global CONCURRENCY_PER_WORKER
+    global CONCURRENCY
 
-    CONCURRENCY_PER_WORKER = int(os.environ['CONCURRENCY'])
+    CONCURRENCY = int(os.environ.get('CONCURRENCY', cpu_count() * 2))
     return response.json({'message': 'success'})
 
 
@@ -150,7 +150,7 @@ async def handle_request(request, exception):
             if sentry:
                 sentry.captureException()
 
-    if CONCURRENCY_PER_WORKER <= 0:
+    if CONCURRENCY <= 0:
         # Read from cache only
         logger.warning('Got 502 for %s in %dms, prerender unavailable',
                        url,
@@ -223,7 +223,7 @@ async def before_server_start(app: Sanic, loop):
         warnings.simplefilter('always', ResourceWarning)
 
     app.prerender = Prerender(loop=loop)
-    if CONCURRENCY_PER_WORKER > 0:
+    if CONCURRENCY > 0:
         try:
             await app.prerender.bootstrap()
         except Exception:
