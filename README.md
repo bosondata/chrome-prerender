@@ -52,6 +52,26 @@ $ # render jpeg
 $ curl http://prerender.example.com:8000/jpeg/http://example.com
 ```
 
+## Configuration
+
+Settings are mostly configured by environment variables.
+
+| ENV                        | default value    | description                                         |
+|----------------------------|------------------|-----------------------------------------------------|
+| HOST                       | 0.0.0.0          | Prerender listen host                               |
+| PORT                       | 8000             | Prerender listen port                               |
+| DEBUG                      | false            | Toggle debug mode                                   |
+| PRERENDER_TIMEOUT          | 30               | renderring timeout                                  |
+| CONCURRENCY                | 2 * CPU count    | Chrome pages count                                  |
+| MAX_ITERATIONS             | 200              | Restart Chrome page after rendering this many pages |
+| CHROME_HOST                | localhost        | Chrome remote debugging host                        |
+| CHROME_PORT                | 9222             | Chrome remote debugging port                        |
+| USER_AGENT                 |                  | Chrome User Agent                                   |
+| PRERENDER_ALLOWED_DOMAINS  |                  | Domains allowed for renderring, comma seperated     |
+| CACHE_BACKEND              | dummy            | Cache backend, `dummy`, `disk`, `s3`                |
+| CACHE_LIVE_TIME            | 3600             | Disk cache live seconds                             |
+| SENTRY_DSN                 |                  | Sentry DSN, for exception monitoring                |
+
 ## Configure client
 
 Please view the original NodeJs version [prerender](https://github.com/prerender/prerender#official-middleware) README.
