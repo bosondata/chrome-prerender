@@ -67,7 +67,7 @@ Settings are mostly configured by environment variables.
 | CHROME_HOST                | localhost        | Chrome remote debugging host                        |
 | CHROME_PORT                | 9222             | Chrome remote debugging port                        |
 | USER_AGENT                 |                  | Chrome User Agent                                   |
-| PRERENDER_ALLOWED_DOMAINS  |                  | Domains allowed for renderring, comma seperated     |
+| ALLOWED_DOMAINS            |                  | Domains allowed for renderring, comma seperated     |
 | CACHE_BACKEND              | dummy            | Cache backend, `dummy`, `disk`, `s3`                |
 | CACHE_LIVE_TIME            | 3600             | Disk cache live seconds                             |
 | SENTRY_DSN                 |                  | Sentry DSN, for exception monitoring                |

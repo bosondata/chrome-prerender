@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 executor = ThreadPoolExecutor(max_workers=cpu_count() * 5)
 
 ALLOWED_DOMAINS: Set = set(dm.strip() for dm in
-                           os.environ.get('PRERENDER_ALLOWED_DOMAINS', '').split(',') if dm.strip())
+                           os.environ.get('ALLOWED_DOMAINS', '').split(',') if dm.strip())
 CACHE_LIVE_TIME: int = int(os.environ.get('CACHE_LIVE_TIME', 3600))
 SENTRY_DSN = os.environ.get('SENTRY_DSN')
 
