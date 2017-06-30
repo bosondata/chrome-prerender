@@ -70,6 +70,12 @@ Settings are mostly configured by environment variables.
 | ALLOWED_DOMAINS            |                  | Domains allowed for renderring, comma seperated     |
 | CACHE_BACKEND              | dummy            | Cache backend, `dummy`, `disk`, `s3`                |
 | CACHE_LIVE_TIME            | 3600             | Disk cache live seconds                             |
+| CACHE_ROOT_DIR             | /tmp/prerender   | Disk cache root directory                           |
+| S3_SERVER                  | s3.amazonaws.com | S3 server address                                   |
+| S3_ACCESS_KEY              |                  | S3 access key                                       |
+| S3_SECRET_KEY              |                  | S3 secret key                                       |
+| S3_REGION                  |                  | S3 region                                           |
+| S3_BUCKET                  | prerender        | S3 bucket name                                      |
 | SENTRY_DSN                 |                  | Sentry DSN, for exception monitoring                |
 
 ## Configure client
