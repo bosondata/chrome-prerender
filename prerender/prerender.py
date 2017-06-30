@@ -85,6 +85,7 @@ class Prerender:
         except RuntimeError as e:
             # https://github.com/MagicStack/uvloop/issues/68
             if 'unable to perform operation' in str(e):
+                logger.error('RuntimeError: %s', str(e))
                 reopen = True
                 raise TemporaryBrowserFailure(str(e))
             else:
