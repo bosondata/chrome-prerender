@@ -4,14 +4,14 @@ Render JavaScript-rendered page as HTML/PDF/mhtml/png/jpeg using headless Chrome
 
 ## Install Chrome
 
-Headless mode is supported in Chrome unstable/dev channel, you should be able to install it via:
+Headless mode is supported in Chrome stable 59+ and unstable/dev channel, you should be able to install it via:
 
 https://www.google.com/chrome/browser/beta.html?platform=linux
 
 ## Start Chrome Headless
 
 ```bash
-$ google-chrome-unstable --headless --remote-debugging-port=9222 --disable-gpu "about:blank"
+$ google-chrome --headless --remote-debugging-port=9222 --disable-gpu "about:blank"
 ```
 
 ## Install Prerender
