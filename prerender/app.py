@@ -20,11 +20,13 @@ from raven_aiohttp import AioHttpTransport
 from .prerender import Prerender, CONCURRENCY
 from .cache import cache
 from .exceptions import TemporaryBrowserFailure, TooManyResponseError
-from .utils import remove_script_tags
+from .utils import apply_filters, remove_script_tags, remove_meta_fragment_tag
 
 
 logger = logging.getLogger(__name__)
 executor = ThreadPoolExecutor(max_workers=cpu_count() * 5)
+
+HTML_FILTERS = [remove_script_tags, remove_meta_fragment_tag]
 
 ALLOWED_DOMAINS: Set = set(dm.strip() for dm in
                            os.environ.get('ALLOWED_DOMAINS', '').split(',') if dm.strip())
@@ -159,7 +161,7 @@ async def handle_request(request, exception):
                             int((time.time() - start_time) * 1000))
                 if format == 'html':
                     return response.html(
-                        remove_script_tags(data.decode('utf-8')),
+                        apply_filters(data.decode('utf-8'), HTML_FILTERS),
                         headers=headers
                     )
                 return response.raw(data, headers=headers)
@@ -186,7 +188,7 @@ async def handle_request(request, exception):
             if 200 <= status_code < 300:
                 executor.submit(_save_to_cache, url, data.encode('utf-8'), format)
             return response.html(
-                remove_script_tags(data),
+                apply_filters(data, HTML_FILTERS),
                 headers=headers,
                 status=status_code
             )
