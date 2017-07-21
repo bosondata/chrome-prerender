@@ -2,6 +2,7 @@ import os
 import lzma
 import asyncio
 from typing import Optional
+from aiofiles.os import stat
 
 import diskcache
 
@@ -26,3 +27,7 @@ class DiskCache(CacheBackend):
     def set(self, key: str, payload: bytes, ttl: int = None, format: str = 'html') -> None:
         compressed = lzma.compress(payload)
         self._cache.set(key + format, compressed, expire=ttl)
+
+    async def modified_since(self, key: str, format: str = 'html') -> Optional[float]:
+        stats = await stat(key + format)
+        return stats.st_mtime
