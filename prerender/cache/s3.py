@@ -2,7 +2,7 @@ import os
 import io
 import codecs
 import asyncio
-from urllib.parse import urlparse, urlencode
+from urllib.parse import urlparse, quote_plus
 from typing import Optional
 
 import minio
@@ -61,7 +61,7 @@ class S3Cache(CacheBackend):
 
     def _filename(self, url, format):
         parsed_url = urlparse(url)
-        encoded_name = urlencode(parsed_url.path)
+        encoded_name = quote_plus(parsed_url.path)
         if parsed_url.query:
-            encoded_name += '?{}'.format(urlencode(parsed_url.query))
+            encoded_name += '?{}'.format(quote_plus(parsed_url.query))
         return os.path.join(parsed_url.hostname, encoded_name)
