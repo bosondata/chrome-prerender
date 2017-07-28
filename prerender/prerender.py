@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 PRERENDER_TIMEOUT: int = int(os.environ.get('PRERENDER_TIMEOUT', 30))
 CONCURRENCY: int = int(os.environ.get('CONCURRENCY', cpu_count() * 2))
-MAX_ITERATIONS: int = int(os.environ.get('ITERATIONS', 200))
+MAX_ITERATIONS: int = int(os.environ.get('MAX_ITERATIONS', 200))
 CHROME_HOST: str = os.environ.get('CHROME_HOST', 'localhost')
 CHROME_PORT: int = int(os.environ.get('CHROME_PORT', 9222))
 USER_AGENT: Optional[str] = os.environ.get('USER_AGENT')
