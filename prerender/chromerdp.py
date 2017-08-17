@@ -1,3 +1,4 @@
+import os
 import math
 import time
 import base64
@@ -19,6 +20,7 @@ from .constants import BLOCKED_URLS
 
 
 logger = logging.getLogger(__name__)
+PAGE_DONE_CHECK_TIMEOUT: int = int(os.getenv('PAGE_DONE_CHECK_TIMEOUT', 200))
 
 
 class ChromeRemoteDebugger:
@@ -239,7 +241,8 @@ class Page:
     async def _wait_responses_ready(self) -> None:
         while True:
             if self._requests_sent > 0 and len(self._responses_received) >= self._requests_sent \
-                    and len(self._res_body_request_ids) == 0 and time.time() - self._last_active_time > 1.0:
+                    and len(self._res_body_request_ids) == 0 \
+                    and (time.time() - self._last_active_time) * 1000 >= PAGE_DONE_CHECK_TIMEOUT:
                 # Prefer window.prerenderReady
                 res = await self.evaluate('typeof window.prerenderReady === "undefined"')
                 if res['result']['result'].get('value'):
