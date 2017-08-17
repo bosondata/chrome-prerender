@@ -130,8 +130,6 @@ class Page:
         self.on('Page.frameStartedLoading', self._update_last_active_time)
         self.on('Page.frameStoppedLoading', self._update_last_active_time)
         self.on('DOM.documentUpdated', self._update_last_active_time)
-        self.on('LayerTree.layerTreeDidChange', self._update_last_active_time)
-        self.on('LayerTree.layerPainted', self._update_last_active_time)
 
         self._ws_task = asyncio.ensure_future(self._listen())
         await asyncio.wait_for(self._enable_events(), timeout=5)
@@ -151,7 +149,6 @@ class Page:
             self.send({'method': 'Log.enable'}),
             self.send({'method': 'Network.enable'}),
             self.send({'method': 'Inspector.enable'}),
-            self.send({'method': 'LayerTree.enable'}),
         )
         await asyncio.gather(*futures)
 
@@ -162,7 +159,6 @@ class Page:
             self.send({'method': 'Log.disable'}),
             self.send({'method': 'Network.disable'}),
             self.send({'method': 'Inspector.disable'}),
-            self.send({'method': 'LayerTree.disable'}),
         )
         await asyncio.gather(*futures)
 
