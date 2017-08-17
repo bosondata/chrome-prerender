@@ -235,20 +235,25 @@ class Page:
             await asyncio.sleep(0.2)
 
     async def _wait_responses_ready(self) -> None:
+        iterations = 0
         while True:
             if self._requests_sent > 0 and len(self._responses_received) >= self._requests_sent \
                     and len(self._res_body_request_ids) == 0 \
                     and (time.time() - self._last_active_time) * 1000 >= PAGE_DONE_CHECK_TIMEOUT:
+                iterations += 1
                 # Prefer window.prerenderReady
                 res = await self.evaluate('typeof window.prerenderReady === "undefined"')
                 if res['result']['result'].get('value'):
-                    # Wait pending browser rendering for a while
                     break
+                elif iterations >= 10:
+                    # In case that someone set prerenderReady to false but never set it to true
+                    break
+            # Wait pending browser rendering for a while
             await asyncio.sleep(0.2)
 
         succeed_res = sum([
             1 if is_response_ok(resp.get('response')) or resp.get('blockedReason') == 'inspector' else 0
-                for resp in self._responses_received.values()
+            for resp in self._responses_received.values()
         ])
         success_rate = succeed_res / len(self._responses_received)
         if success_rate < 0.8:
@@ -348,6 +353,8 @@ class Page:
             task.result()  # To trigger exception if any
 
         status_code = await self.get_status_code()
+        if status_code == 304:
+            status_code = 200
         if format == 'html':
             html = await self.get_html()
             self._render_future.set_result((html, status_code))
