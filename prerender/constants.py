@@ -1,5 +1,6 @@
+import os
 
-BLOCKED_URLS = (
+BLOCKED_URLS = [
     "google-analytics.com",
     "api.mixpanel.com",
     "stats.g.doubleclick.net",
@@ -23,4 +24,12 @@ BLOCKED_URLS = (
     "tpc.googlesyndication.com",
     "partner.googleadservices.com",
     "hm.baidu.com",
-)
+]
+
+if os.getenv('BLOCK_FONTS', '1').lower() in ('1', 'y', 'yes', 'on', 't', 'true'):
+    BLOCKED_URLS.extend((
+        ".ttf",
+        ".eot",
+        ".otf",
+        ".woff",
+    ))

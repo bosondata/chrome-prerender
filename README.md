@@ -74,6 +74,7 @@ Settings are mostly configured by environment variables.
 | CHROME_HOST                | localhost        | Chrome remote debugging host                                                                    |
 | CHROME_PORT                | 9222             | Chrome remote debugging port                                                                    |
 | USER_AGENT                 |                  | Chrome User Agent                                                                               |
+| BLOCK_FONTS                | 1                | Block web fonts loading, set to 0 to allow fonts loading                                        |
 | ALLOWED_DOMAINS            |                  | Domains allowed for renderring, comma seperated                                                 |
 | CACHE_BACKEND              | dummy            | Cache backend, `dummy`, `disk`, `s3`                                                            |
 | CACHE_LIVE_TIME            | 3600             | Disk cache live seconds                                                                         |
