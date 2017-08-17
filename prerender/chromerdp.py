@@ -232,7 +232,7 @@ class Page:
             res = await self.evaluate('window.prerenderReady == true')
             if res['result']['result'].get('value'):
                 return True
-            await asyncio.sleep(0.1)
+            await asyncio.sleep(0.2)
 
     async def _wait_responses_ready(self) -> None:
         iterations = 0
@@ -294,11 +294,12 @@ class Page:
 
     def _on_request_will_be_sent(self, obj: Dict) -> None:
         redirect = obj['params'].get('redirectResponse')
+        document_url = obj['params']['documentURL']
         self._last_active_time = time.time()
-        if not redirect:
+        if not redirect and document_url == self._url:
             self._requests_sent += 1
         else:
-            if redirect['url'] == self._url:
+            if redirect and redirect['url'] == self._url:
                 self._url = CIMultiDict(redirect['headers'])['location']
 
     def _on_response_received(self, obj: Dict) -> None:
