@@ -248,7 +248,7 @@ class Page:
                 if res['result']['result'].get('value'):
                     # Wait pending browser rendering for a while
                     break
-            await asyncio.sleep(0.5)
+            await asyncio.sleep(0.2)
 
         succeed_res = sum([
             1 if is_response_ok(resp.get('response')) or resp.get('blockedReason') == 'inspector' else 0
