@@ -14,6 +14,12 @@ https://www.google.com/chrome/browser/beta.html?platform=linux
 $ google-chrome --headless --remote-debugging-port=9222 --disable-gpu "about:blank"
 ```
 
+To disable image loading, add `--blink-settings=imagesEnabled=false` argument:
+
+```bash
+$ google-chrome --headless --remote-debugging-port=9222 --disable-gpu --blink-settings=imagesEnabled=false "about:blank"
+```
+
 ## Install Prerender
 
 ```bash
