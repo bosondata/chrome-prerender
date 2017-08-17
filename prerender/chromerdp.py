@@ -232,7 +232,7 @@ class Page:
             res = await self.evaluate('window.prerenderReady == true')
             if res['result']['result'].get('value'):
                 return True
-            await asyncio.sleep(0.2)
+            await asyncio.sleep(0.1)
 
     async def _wait_responses_ready(self) -> None:
         iterations = 0
@@ -249,7 +249,7 @@ class Page:
                     # In case that someone set prerenderReady to false but never set it to true
                     break
             # Wait pending browser rendering for a while
-            await asyncio.sleep(0.2)
+            await asyncio.sleep(0.1)
 
         succeed_res = sum([
             1 if is_response_ok(resp.get('response')) or resp.get('blockedReason') == 'inspector' else 0
