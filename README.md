@@ -85,6 +85,9 @@ Settings are mostly configured by environment variables.
 | S3_REGION                  |                  | S3 region                                                                                       |
 | S3_BUCKET                  | prerender        | S3 bucket name                                                                                  |
 | SENTRY_DSN                 |                  | Sentry DSN, for exception monitoring                                                            |
+| ENABLE_CIRCUIT_BREAKER     | false            | enable circuit breaker                                                                          |
+| CIRCUIT_BREAKER_FAIL_MAX   | 5                | maximum failures per browser/bot before circuit breaker open                                    |
+| CIRCUIT_BREAKER_RESET_TIMEOUT | 60            | circuit breaker reset timeout in seconds                                                        |
 
 ## Configure client
 
