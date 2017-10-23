@@ -1,7 +1,7 @@
 import os
 import io
-import codecs
 import asyncio
+from time import mktime
 from urllib.parse import urlparse, quote_plus
 from typing import Optional
 
@@ -66,8 +66,7 @@ class S3Cache(CacheBackend):
             res = await loop.run_in_executor(None, self.client.stat_object, S3_BUCKET, path)
         except (minio.error.NoSuchKey, asyncio.CancelledError):
             return
-        return res.last_modified
-
+        return mktime(res.last_modified)
 
     def _filename(self, url, format):
         parsed_url = urlparse(url)
