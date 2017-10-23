@@ -18,7 +18,7 @@ from sanic import Sanic
 from sanic import response
 from sanic.exceptions import NotFound
 from raven_aiohttp import AioHttpTransport
-from failsafe import Failsafe, CircuitBreaker, CircuitOpen
+from failsafe import Failsafe, CircuitBreaker, CircuitOpen, RetriesExhausted
 
 from .prerender import Prerender, CONCURRENCY
 from .cache import cache
@@ -212,7 +212,7 @@ async def handle_request(request, exception):
         if 200 <= status_code < 300:
             executor.submit(_save_to_cache, url, data, format)
         return response.raw(data, headers=headers, status=status_code)
-    except (asyncio.TimeoutError, asyncio.CancelledError, TemporaryBrowserFailure):
+    except (asyncio.TimeoutError, asyncio.CancelledError, TemporaryBrowserFailure, RetriesExhausted):
         logger.warning('Got 504 for %s in %dms',
                        url,
                        int((time.time() - start_time) * 1000))
