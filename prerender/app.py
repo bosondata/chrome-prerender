@@ -8,30 +8,41 @@ import warnings
 from urllib.parse import urlparse
 from concurrent.futures import ThreadPoolExecutor
 from multiprocessing import cpu_count
-from typing import Set
+from typing import Set, Optional, Tuple, Callable
 from email.utils import parsedate, formatdate
+from collections import defaultdict
 
 import raven
+import httpagentparser
 from sanic import Sanic
 from sanic import response
 from sanic.exceptions import NotFound
 from raven_aiohttp import AioHttpTransport
+from failsafe import Failsafe, CircuitBreaker, CircuitOpen, RetriesExhausted
 
 from .prerender import Prerender, CONCURRENCY
 from .cache import cache
 from .exceptions import TemporaryBrowserFailure, TooManyResponseError
-from .utils import apply_filters, remove_script_tags, remove_meta_fragment_tag
+from .utils import apply_filters, remove_script_tags, remove_meta_fragment_tag, is_yesish
 
 
 logger = logging.getLogger(__name__)
 executor = ThreadPoolExecutor(max_workers=cpu_count() * 5)
 
-HTML_FILTERS = [remove_script_tags, remove_meta_fragment_tag]
-
+HTML_FILTERS: Tuple[Callable[[str], str]] = (remove_script_tags, remove_meta_fragment_tag)
 ALLOWED_DOMAINS: Set = set(dm.strip() for dm in
-                           os.environ.get('ALLOWED_DOMAINS', '').split(',') if dm.strip())
-CACHE_LIVE_TIME: int = int(os.environ.get('CACHE_LIVE_TIME', 3600))
-SENTRY_DSN = os.environ.get('SENTRY_DSN')
+                           os.getenv('ALLOWED_DOMAINS', '').split(',') if dm.strip())
+CACHE_LIVE_TIME: int = int(os.getenv('CACHE_LIVE_TIME', 3600))
+SENTRY_DSN: Optional[str] = os.getenv('SENTRY_DSN')
+_ENABLE_CB = is_yesish(os.getenv('ENABLE_CIRCUIT_BREAKER', '0'))
+_CB_FAIL_MAX: int = int(os.getenv('CIRCUIT_BREAKER_FAIL_MAX', 5))
+_CB_RESET_TIMEOUT: int = int(os.getenv('CIRCUIT_BREAKER_RESET_TIMEOUT', 60))
+_BREAKERS = defaultdict(
+    lambda: Failsafe(circuit_breaker=CircuitBreaker(
+        maximum_failures=_CB_FAIL_MAX,
+        reset_timeout_seconds=_CB_RESET_TIMEOUT
+    ))
+)
 
 if SENTRY_DSN:
     sentry = raven.Client(
@@ -178,7 +189,13 @@ async def handle_request(request, exception):
         return response.text('Bad Gateway', status=502)
 
     try:
-        data, status_code = await _render(request.app.prerender, url, format)
+        if _ENABLE_CB:
+            user_agent = request.headers.get('user-agent', '')
+            _os, browser = httpagentparser.simple_detect(user_agent)
+            breaker = _BREAKERS[browser]
+            data, status_code = await breaker.run(lambda: _render(request.app.prerender, url, format))
+        else:
+            data, status_code = await _render(request.app.prerender, url, format)
         headers.update({'X-Prerender-Cache': 'miss', 'Last-Modified': formatdate(usegmt=True)})
         logger.info('Got %d for %s in %dms',
                     status_code,
@@ -195,7 +212,7 @@ async def handle_request(request, exception):
         if 200 <= status_code < 300:
             executor.submit(_save_to_cache, url, data, format)
         return response.raw(data, headers=headers, status=status_code)
-    except (asyncio.TimeoutError, asyncio.CancelledError, TemporaryBrowserFailure):
+    except (asyncio.TimeoutError, asyncio.CancelledError, TemporaryBrowserFailure, RetriesExhausted):
         logger.warning('Got 504 for %s in %dms',
                        url,
                        int((time.time() - start_time) * 1000))
@@ -204,6 +221,9 @@ async def handle_request(request, exception):
         logger.warning('Too many response error for %s in %dms',
                        url,
                        int((time.time() - start_time) * 1000))
+        return response.text('Service unavailable', status=503)
+    except CircuitOpen:
+        logger.warning('Circuit breaker open for %s', browser)
         return response.text('Service unavailable', status=503)
     except Exception:
         logger.exception('Internal Server Error for %s in %dms',

@@ -1,5 +1,7 @@
 import os
 
+from .utils import is_yesish
+
 BLOCKED_URLS = [
     "google-analytics.com",
     "api.mixpanel.com",
@@ -26,7 +28,7 @@ BLOCKED_URLS = [
     "hm.baidu.com",
 ]
 
-if os.getenv('BLOCK_FONTS', '1').lower() in ('1', 'y', 'yes', 'on', 't', 'true'):
+if is_yesish(os.getenv('BLOCK_FONTS', '1')):
     BLOCKED_URLS.extend((
         ".ttf",
         ".eot",
