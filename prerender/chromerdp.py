@@ -298,6 +298,10 @@ class Page:
         self._last_active_time = time.time()
         if not redirect and document_url == self._url:
             self._requests_sent += 1
+        elif not redirect and document_url != self._url and self._requests_sent == 0:
+            # https://www.baidu.com Chrome navigate to https://www.baidu.com/
+            self._url = document_url
+            self._requests_sent += 1
         else:
             if redirect and redirect['url'] == self._url:
                 self._url = CIMultiDict(redirect['headers'])['location']
