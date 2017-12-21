@@ -21,15 +21,8 @@ S3_BUCKET = os.environ.get('S3_BUCKET', 'prerender')
 
 class S3Cache(CacheBackend):
     def __init__(self) -> None:
-        self.client = minio.Minio(
-            S3_SERVER,
-            access_key=S3_ACCESS_KEY,
-            secret_key=S3_SECRET_KEY,
-            region=S3_REGION,
-            secure=S3_SERVER == 's3.amazonaws.com',
-        )
-        self.client._http = urllib3.PoolManager(
-            timeout=self.client._conn_timeout,
+        http_client = urllib3.PoolManager(
+            timeout=urllib3.Timeout.DEFAULT_TIMEOUT,
             cert_reqs='CERT_REQUIRED',
             ca_certs=certifi.where(),
             retries=urllib3.Retry(
@@ -38,6 +31,14 @@ class S3Cache(CacheBackend):
                 status_forcelist=[500, 502, 503, 504]
             ),
             maxsize=20
+        )
+        self.client = minio.Minio(
+            S3_SERVER,
+            access_key=S3_ACCESS_KEY,
+            secret_key=S3_SECRET_KEY,
+            region=S3_REGION,
+            secure=S3_SERVER == 's3.amazonaws.com',
+            http_client=http_client
         )
 
     async def get(self, key: str, format: str = 'html') -> Optional[bytes]:

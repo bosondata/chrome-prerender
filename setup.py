@@ -49,7 +49,7 @@ setup(
     tests_require=['pytest'],
     extras_require={
         'diskcache': ['diskcache'],
-        's3': ['minio>=2.2.5'],
+        's3': ['minio>=3.0.0'],
     },
     cmdclass={'test': PyTest},
     entry_points='''
