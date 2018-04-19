@@ -2,6 +2,7 @@ websockets
 aiohttp
 ujson
 sanic>=0.7
+sanic_compress
 raven
 raven-aiohttp
 diskcache

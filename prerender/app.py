@@ -17,6 +17,7 @@ import httpagentparser
 from sanic import Sanic
 from sanic import response
 from sanic.exceptions import NotFound
+from sanic_compress import Compress
 from raven_aiohttp import AioHttpTransport
 from failsafe import Failsafe, CircuitBreaker, CircuitOpen, RetriesExhausted
 
@@ -68,6 +69,7 @@ app = Sanic(__name__)
 app.config.from_object(dict(
     KEEP_ALIVE=False,
 ))
+Compress(app)
 
 
 @app.route('/browser/list')
