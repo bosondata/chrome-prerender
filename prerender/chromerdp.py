@@ -444,7 +444,7 @@ class Page:
         res = await self.evaluate('window.prerenderStatusCode')
         status = res['result']['result'].get('value')
         if status is None or status == 'undefined':
-            for item in self._responses_received.values():
+            for item in tuple(self._responses_received.values()):
                 res = item.get('response')
                 if not res:
                     await asyncio.sleep(0)  # Let others run
