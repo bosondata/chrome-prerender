@@ -58,8 +58,8 @@ class ChromeRemoteDebugger:
         async with self._session.get('{}/json/version'.format(self._debugger_url)) as res:
             return await res.json(loads=json.loads)
 
-    def shutdown(self) -> None:
-        self._session.close()
+    async def shutdown(self) -> None:
+        await self._session.close()
 
     def __repr__(self) -> str:
         return '<ChromeRemoteDebugger@{}>'.format(self._debugger_url)
@@ -75,6 +75,7 @@ class Page:
         self.iteration: int = 0
         # TODO: detech window height using `Browser.getWindowForTarget` when it is available
         self._window_height: int = 600
+        self._http = aiohttp.ClientSession(loop=loop)
         self._reset()
 
     def _reset(self) -> None:
@@ -92,19 +93,22 @@ class Page:
         self._res_body_request_ids: Dict = {}
         self._last_active_time: float = 0
         self._url: Optional[str] = None
+        self._intercept_requests: bool = False
+        self._proxy: str = ''
 
     @property
     def _next_request_id(self) -> int:
         self._request_id += 1
         return self._request_id
 
-    async def attach(self) -> None:
+    async def attach(self, proxy: str = '') -> None:
         logger.debug('Connecting to %s', self.websocket_debugger_url)
         self.websocket = await websockets.connect(
             self.websocket_debugger_url,
             max_size=5 * 2 ** 20,  # 5M
             loop=self.loop,
         )
+        self._proxy = proxy
 
         self.on('Inspector.detached', self._on_inspector_detached)
         self.on('Inspector.targetCrashed', self._on_inspector_target_crashed)
@@ -112,6 +116,7 @@ class Page:
         self.on('Network.requestWillBeSent', self._on_request_will_be_sent)
         self.on('Network.responseReceived', self._on_response_received)
         self.on('Network.loadingFailed', self._on_response_received)
+        self.on('Network.requestIntercepted', self._on_request_intercepted)
 
         self.on('Network.dataReceived', self._update_last_active_time)
         self.on('Network.resourceChangedPriority', self._update_last_active_time)
@@ -136,6 +141,7 @@ class Page:
         if self.user_agent is not None:
             await self.set_user_agent(self.user_agent)
         await self.set_blocked_urls(BLOCKED_URLS)
+        await self.set_request_interception(bool(proxy))
 
     async def detach(self) -> None:
         self._ws_task.cancel()
@@ -210,6 +216,23 @@ class Page:
             'params': {'urls': urls}
         })
 
+    async def set_request_interception(self, enable: bool = True) -> None:
+        if enable == self._intercept_requests:
+            return
+        self._intercept_requests = enable
+        patterns = [{'urlPattern': '*'}] if enable else []
+        futures = await asyncio.gather(
+            self.send({
+                'method': 'Network.setRequestInterception',
+                'params': {'patterns': patterns}
+            }),
+            self.send({
+                'method': 'Network.setCacheDisabled',
+                'params': {'cacheDisabled': enable}
+            }),
+        )
+        await asyncio.gather(*futures)
+
     async def navigate(self, url: str) -> Dict:
         if url != 'about:blank':
             self.iteration += 1
@@ -280,8 +303,8 @@ class Page:
         self.on('Page.loadEventFired', partial(self._on_page_load_event_fired, format=format))
         self.on('Network.loadingFinished', partial(self._on_loading_finished, format=format))
         try:
-            await self.navigate(url)
             self._url = url
+            await self.navigate(url)
             return await self._render_future
         finally:
             self._url = None
@@ -292,9 +315,37 @@ class Page:
     def _update_last_active_time(self, _obj: Dict) -> None:
         self._last_active_time = time.time()
 
+    async def _on_request_intercepted(self, obj: Dict) -> None:
+        resource_type = obj['params']['resourceType'].lower()
+        if resource_type in ('document', 'xhr', 'image', 'script', 'fetch'):
+            request = obj['params']['request']
+            method = request['method']
+            url = request['url']
+            headers = request['headers']
+            kwargs = {'headers': headers}
+            post_data = request.get('postData')
+            if post_data:
+                kwargs['data'] = post_data
+            resp = await self._http.request(method, url, **kwargs)
+            raw_resp = await create_raw_response(resp)
+            await self.send({
+                'method': 'Network.continueInterceptedRequest',
+                'params': {
+                    'interceptionId': obj['params']['interceptionId'],
+                    'rawResponse': raw_resp,
+                }
+            })
+        else:
+            await self.send({
+                'method': 'Network.continueInterceptedRequest',
+                'params': {'interceptionId': obj['params']['interceptionId']}
+            })
+
     def _on_request_will_be_sent(self, obj: Dict) -> None:
-        redirect = obj['params'].get('redirectResponse')
         document_url = obj['params']['documentURL']
+        redirect = obj['params'].get('redirectResponse')
+        if not redirect and document_url[len(self._url):] == '/':
+            redirect = {'url': self._url, 'headers': {'location': document_url}}
         self._last_active_time = time.time()
         if not redirect and document_url == self._url:
             self._requests_sent += 1
@@ -438,6 +489,7 @@ class Page:
         return res['result']['result']['value']
 
     async def close(self) -> None:
+        await self._http.close()
         await self._debugger.close_page(self.id)
 
     async def get_status_code(self) -> int:
@@ -469,3 +521,19 @@ def is_response_ok(response):
         return False
     status = response['status']
     return status < 400
+
+
+async def create_raw_response(resp) -> str:
+    import base64
+
+    body = await resp.read()
+    raw_resp = []
+    CRLF = '\r\n'
+    status_line = f'HTTP 1.1 {resp.status} {resp.reason}{CRLF}'
+    raw_resp.append(status_line.encode('utf-8'))
+    for (name, value) in resp.raw_headers:
+        raw_resp.append(f'{name}: {value}{CRLF}'.encode('utf-8'))
+    raw_resp.append(CRLF.encode('utf-8'))
+    raw_resp.append(body)
+    raw_buf = b''.join(raw_resp)
+    return base64.b64encode(raw_buf).decode('ascii')

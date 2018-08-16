@@ -1,5 +1,7 @@
 websockets
 aiohttp
+aiodns
+cchardet
 ujson
 sanic>=0.7
 sanic_compress

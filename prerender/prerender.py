@@ -53,9 +53,9 @@ class Prerender:
     async def shutdown(self) -> None:
         for page in self._pages:
             await page.close()
-        self._rdp.shutdown()
+        await self._rdp.shutdown()
 
-    async def render(self, url: str, format: str = 'html') -> str:
+    async def render(self, url: str, format: str = 'html', proxy: str = '') -> str:
         if not self._pages:
             raise RuntimeError('No browser available')
 
@@ -67,7 +67,7 @@ class Prerender:
         reopen = False
         try:
             try:
-                await page.attach()
+                await page.attach(proxy)
             except asyncio.TimeoutError:
                 logger.error('Attach to Chrome page %s timed out, page is likely closed', page.id)
                 reopen = True
