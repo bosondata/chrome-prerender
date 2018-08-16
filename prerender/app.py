@@ -102,11 +102,11 @@ async def enable_browser_rendering(request):
     return response.json({'message': 'success'})
 
 
-async def _render(prerender: Prerender, url: str, format: str = 'html') -> str:
+async def _render(prerender: Prerender, url: str, format: str = 'html', proxy: str = '') -> str:
     '''Retry once after TemporaryBrowserFailure occurred.'''
     for i in range(2):
         try:
-            return await prerender.render(url, format)
+            return await prerender.render(url, format, proxy)
         except (TemporaryBrowserFailure, asyncio.TimeoutError) as e:
             if i < 1:
                 logger.warning('Temporary browser failure: %s, retry rendering %s in 1s', str(e), url)
@@ -140,6 +140,7 @@ async def handle_request(request, exception):
     if request.query_string:
         url = url + '?' + request.query_string
     parsed_url = urlparse(url)
+    proxy = request.headers.get('X-Prerender-Proxy', '')
 
     if not parsed_url.hostname:
         return response.text('Bad Request', status=400)
@@ -195,9 +196,9 @@ async def handle_request(request, exception):
             user_agent = request.headers.get('user-agent', '')
             _os, browser = httpagentparser.simple_detect(user_agent)
             breaker = _BREAKERS[browser]
-            data, status_code = await breaker.run(lambda: _render(request.app.prerender, url, format))
+            data, status_code = await breaker.run(lambda: _render(request.app.prerender, url, format, proxy))
         else:
-            data, status_code = await _render(request.app.prerender, url, format)
+            data, status_code = await _render(request.app.prerender, url, format, proxy)
         headers.update({'X-Prerender-Cache': 'miss', 'Last-Modified': formatdate(usegmt=True)})
         logger.info('Got %d for %s in %dms',
                     status_code,
